@@ -1,0 +1,37 @@
+/**
+ * API base URL - sabhi pages yahi se API call karenge
+ */
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+/**
+ * Auth token get karke headers return karta hai (Bearer token)
+ * @param {string} token - useAuthStore.getState().token
+ */
+export function getAuthHeaders(token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
+/**
+ * API request helper - auth header automatically add
+ * @param {string} path - e.g. '/auth/login' or '/api/superadmin/companies'
+ * @param {object} options - fetch options (method, body, headers extra)
+ * @param {string} token - optional, from useAuthStore
+ */
+export async function apiRequest(path, options = {}, token = null) {
+  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+  const headers = getAuthHeaders(token);
+  if (options.headers) Object.assign(headers, options.headers);
+  const res = await fetch(url, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.message || data.error || `Request failed ${res.status}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+export default { API_BASE_URL, getAuthHeaders, apiRequest };
