@@ -8,8 +8,8 @@ const PackingTask = sequelize.define('PackingTask', {
   assignedTo: { type: DataTypes.INTEGER, allowNull: true },
   status: {
     type: DataTypes.STRING,
-    defaultValue: 'pending',
-    validate: { isIn: [['pending', 'packing', 'completed']] },
+    defaultValue: 'NOT_STARTED',
+    validate: { isIn: [['NOT_STARTED', 'ASSIGNED', 'PACKING', 'PACKED', 'ON_HOLD']] },
   },
   packedAt: { type: DataTypes.DATE, allowNull: true },
 }, {

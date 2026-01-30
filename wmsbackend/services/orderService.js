@@ -1,4 +1,4 @@
-const { SalesOrder, OrderItem, Product, Customer, Company, PickList, PickListItem, PackingTask, Warehouse } = require('../models');
+const { SalesOrder, OrderItem, Product, Customer, Company, PickList, PickListItem, PackingTask, Warehouse, Shipment } = require('../models');
 const { Op } = require('sequelize');
 
 async function list(reqUser, query = {}) {
@@ -29,6 +29,7 @@ async function getById(id, reqUser) {
       { association: 'OrderItems', include: ['Product'] },
       { association: 'PickLists', include: ['PickListItems', 'Warehouse', 'User'] },
       { association: 'PackingTasks', include: ['User'] },
+      { association: 'Shipment' },
     ],
   });
   if (!order) throw new Error('Order not found');
@@ -52,7 +53,7 @@ async function create(data, reqUser) {
     orderType: data.orderType || null,
     referenceNumber: data.referenceNumber || null,
     notes: data.notes || null,
-    status: 'pending',
+    status: 'DRAFT',
     totalAmount: 0,
     createdBy: reqUser.id,
   });
@@ -71,14 +72,14 @@ async function create(data, reqUser) {
       });
       total += Number(unitPrice) * qty;
     }
-    await order.update({ totalAmount: total, status: 'pending' });
+    await order.update({ totalAmount: total, status: 'DRAFT' });
   }
   const warehouse = await Warehouse.findOne({ where: { companyId } });
   if (warehouse && data.items?.length) {
     const pickList = await PickList.create({
       salesOrderId: order.id,
       warehouseId: warehouse.id,
-      status: 'pending',
+      status: 'NOT_STARTED',
     });
     for (const row of data.items) {
       await PickListItem.create({
@@ -88,11 +89,11 @@ async function create(data, reqUser) {
         quantityPicked: 0,
       });
     }
-    await order.update({ status: 'pick_list_created' });
+    await order.update({ status: 'CONFIRMED' });
     await PackingTask.create({
       salesOrderId: order.id,
       pickListId: pickList.id,
-      status: 'pending',
+      status: 'NOT_STARTED',
     });
   }
   return getById(order.id, reqUser);
@@ -102,9 +103,9 @@ async function update(id, data, reqUser) {
   const order = await SalesOrder.findByPk(id);
   if (!order) throw new Error('Order not found');
   if (reqUser.role !== 'super_admin' && order.companyId !== reqUser.companyId) throw new Error('Order not found');
-  const allowedStatuses = ['pending', 'pick_list_created'];
-  if (!allowedStatuses.includes((order.status || '').toLowerCase())) {
-    throw new Error('Only pending or pick_list_created orders can be edited');
+  const allowedStatuses = ['DRAFT', 'CONFIRMED'];
+  if (!allowedStatuses.includes((order.status || '').toUpperCase())) {
+    throw new Error('Only DRAFT or CONFIRMED orders can be edited');
   }
   await order.update({
     customerId: data.customerId !== undefined ? data.customerId : order.customerId,
@@ -141,9 +142,9 @@ async function remove(id, reqUser) {
   const order = await SalesOrder.findByPk(id);
   if (!order) throw new Error('Order not found');
   if (reqUser.role !== 'super_admin' && order.companyId !== reqUser.companyId) throw new Error('Order not found');
-  const allowedStatuses = ['pending', 'pick_list_created'];
-  if (!allowedStatuses.includes((order.status || '').toLowerCase())) {
-    throw new Error('Only pending or pick_list_created orders can be deleted');
+  const allowedStatuses = ['DRAFT', 'CONFIRMED'];
+  if (!allowedStatuses.includes((order.status || '').toUpperCase())) {
+    throw new Error('Only DRAFT or CONFIRMED orders can be deleted');
   }
   await OrderItem.destroy({ where: { salesOrderId: order.id } });
   const { PickList, PickListItem, PackingTask } = require('../models');

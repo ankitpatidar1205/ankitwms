@@ -39,4 +39,22 @@ async function completePacking(req, res, next) {
   }
 }
 
-module.exports = { list, getById, assignPacker, completePacking };
+async function startPacking(req, res, next) {
+  try {
+    const data = await packingService.startPacking(req.params.id, req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function rejectAssignment(req, res, next) {
+  try {
+    const data = await packingService.rejectAssignment(req.params.id, req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { list, getById, assignPacker, completePacking, startPacking, rejectAssignment };

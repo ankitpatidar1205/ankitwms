@@ -61,7 +61,7 @@ export default function ViewSalesOrder() {
                     <Link to="/sales-orders" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium">
                         <ArrowLeftOutlined /> Back
                     </Link>
-                    {['pending', 'pick_list_created'].includes((order.status || '').toLowerCase()) && (
+                    {['DRAFT', 'CONFIRMED'].includes((order.status || '').toUpperCase()) && (
                         <Button type="primary" icon={<EditOutlined />} onClick={() => navigate(`/sales-orders/${id}/edit`)} className="rounded-xl">
                             Edit Order
                         </Button>
@@ -75,8 +75,19 @@ export default function ViewSalesOrder() {
                 <Card title="Order Information" className="rounded-2xl shadow-sm border-gray-100">
                     <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small" className="rounded-lg overflow-hidden">
                         <Descriptions.Item label="Order Number">{order.orderNumber}</Descriptions.Item>
-                        <Descriptions.Item label="Status"><Tag color={getStatusColor(order.status)} className="uppercase">{order.status}</Tag></Descriptions.Item>
+                        <Descriptions.Item label="Master Status"><Tag color={getStatusColor(order.status)} className="uppercase font-bold">{order.status}</Tag></Descriptions.Item>
+
+                        <Descriptions.Item label="Picking Status">
+                            {order.PickLists?.[0] ? <Tag color="blue">{order.PickLists[0].status}</Tag> : 'NOT STARTED'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Packing Status">
+                            {order.PackingTasks?.[0] ? <Tag color="orange">{order.PackingTasks[0].status}</Tag> : 'NOT STARTED'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Shipment Status">
+                            {order.Shipment ? <Tag color="green">{order.Shipment.deliveryStatus}</Tag> : 'NOT STARTED'}
+                        </Descriptions.Item>
                         <Descriptions.Item label="Customer">{customerName}</Descriptions.Item>
+
                         <Descriptions.Item label="Order Date">{formatDate(order.orderDate || order.createdAt)}</Descriptions.Item>
                         <Descriptions.Item label="Required Date">{order.requiredDate ? formatDate(order.requiredDate) : '—'}</Descriptions.Item>
                         <Descriptions.Item label="Priority">{order.priority || '—'}</Descriptions.Item>

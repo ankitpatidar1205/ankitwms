@@ -4,15 +4,40 @@ export const APP_NAME = 'Kiaan WMS';
 export const APP_VERSION = '1.0.0';
 
 // Order statuses
+// Order statuses
 export const ORDER_STATUSES = [
-    { value: 'PENDING', label: 'Pending', color: 'orange' },
+    { value: 'DRAFT', label: 'Draft', color: 'gray' },
     { value: 'CONFIRMED', label: 'Confirmed', color: 'blue' },
-    { value: 'ALLOCATED', label: 'Allocated', color: 'cyan' },
-    { value: 'PICKING', label: 'Picking', color: 'purple' },
-    { value: 'PACKING', label: 'Packing', color: 'purple' },
-    { value: 'SHIPPED', label: 'Shipped', color: 'green' },
+    { value: 'PICKING_IN_PROGRESS', label: 'Picking In Progress', color: 'purple' },
+    { value: 'PICKED', label: 'Picked', color: 'cyan' },
+    { value: 'PACKING_IN_PROGRESS', label: 'Packing In Progress', color: 'orange' },
+    { value: 'PACKED', label: 'Packed', color: 'green' },
+    { value: 'SHIPPED', label: 'Shipped', color: 'blue' },
     { value: 'DELIVERED', label: 'Delivered', color: 'green' },
     { value: 'CANCELLED', label: 'Cancelled', color: 'red' },
+];
+
+export const PICK_LIST_STATUSES = [
+    { value: 'NOT_STARTED', label: 'Not Started', color: 'gray' },
+    { value: 'ASSIGNED', label: 'Assigned', color: 'blue' },
+    { value: 'PARTIALLY_PICKED', label: 'Partially Picked', color: 'orange' },
+    { value: 'PICKED', label: 'Picked', color: 'green' },
+];
+
+export const PACKING_STATUSES = [
+    { value: 'NOT_STARTED', label: 'Not Started', color: 'gray' },
+    { value: 'PACKING', label: 'Packing', color: 'orange' },
+    { value: 'PACKED', label: 'Packed', color: 'green' },
+    { value: 'ON_HOLD', label: 'On Hold', color: 'red' },
+];
+
+export const SHIPMENT_STATUSES = [
+    { value: 'READY_TO_SHIP', label: 'Ready to Ship', color: 'blue' },
+    { value: 'SHIPPED', label: 'Shipped', color: 'cyan' },
+    { value: 'IN_TRANSIT', label: 'In Transit', color: 'purple' },
+    { value: 'DELIVERED', label: 'Delivered', color: 'green' },
+    { value: 'FAILED', label: 'Failed', color: 'red' },
+    { value: 'RETURNED', label: 'Returned', color: 'red' },
 ];
 
 // Inventory statuses

@@ -8,8 +8,8 @@ const PickList = sequelize.define('PickList', {
   assignedTo: { type: DataTypes.INTEGER, allowNull: true },
   status: {
     type: DataTypes.STRING,
-    defaultValue: 'pending',
-    validate: { isIn: [['pending', 'in_progress', 'completed']] },
+    defaultValue: 'NOT_STARTED',
+    validate: { isIn: [['NOT_STARTED', 'ASSIGNED', 'PARTIALLY_PICKED', 'PICKED']] },
   },
 }, {
   tableName: 'pick_lists',

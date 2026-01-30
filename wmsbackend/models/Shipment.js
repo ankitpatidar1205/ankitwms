@@ -10,7 +10,11 @@ const Shipment = sequelize.define('Shipment', {
   trackingNumber: { type: DataTypes.STRING },
   weight: { type: DataTypes.DECIMAL(10, 2) },
   dispatchDate: { type: DataTypes.DATEONLY },
-  deliveryStatus: { type: DataTypes.STRING, defaultValue: 'pending' },
+  deliveryStatus: {
+    type: DataTypes.STRING,
+    defaultValue: 'READY_TO_SHIP',
+    validate: { isIn: [['READY_TO_SHIP', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'FAILED', 'RETURNED']] },
+  },
 }, {
   tableName: 'shipments',
   timestamps: true,
