@@ -72,8 +72,14 @@ export default function SalesOrders() {
         return matchesSearch && matchesChannel && matchesStatus;
     });
 
+    const shortenOrderNumber = (num) => {
+        if (!num) return '—';
+        const parts = num.split('-');
+        return parts.length === 3 ? `ORD-${parts[2]}` : num;
+    };
+
     const columns = [
-        { title: 'Order #', dataIndex: 'orderNumber', key: 'orderNumber', render: (v, r) => <Link to={`/sales-orders/${r.id}`} className="font-bold text-blue-600 hover:underline">{v}</Link> },
+        { title: 'Order #', dataIndex: 'orderNumber', key: 'orderNumber', render: (v, r) => <Link to={`/sales-orders/${r.id}`} className="font-bold text-blue-600 hover:underline">{shortenOrderNumber(v)}</Link> },
         { title: 'Customer', key: 'customer', render: (_, r) => (r.Customer?.name || r.customer?.name) || '-' },
         { title: 'Channel', dataIndex: 'salesChannel', key: 'channel', render: (c) => <Tag color="blue" className="uppercase">{c || 'Direct'}</Tag> },
         { title: 'Date', dataIndex: 'orderDate', key: 'orderDate', render: (v, r) => formatDate(v || r.createdAt) },

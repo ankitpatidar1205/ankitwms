@@ -77,7 +77,6 @@ export const MainLayout = ({ children }) => {
     const getPackerMenu = () => [
         { key: '/dashboards/packer', icon: <DashboardOutlined />, label: 'My Dashboard' },
         { key: '/packing', icon: <BoxPlotOutlined />, label: 'Packing Tasks' },
-        { key: '/shipments', icon: <CarOutlined />, label: 'Shipments' },
     ];
 
     const getViewerMenu = () => [
