@@ -40,12 +40,12 @@ export const MainLayout = ({ children }) => {
     const { sidebarCollapsed, toggleSidebar } = useUIStore();
     const [openKeys, setOpenKeys] = useState([]);
 
-    // Current path ka parent submenu open rakho; openKeys replace mat karo taaki dropdown apne aap band na ho
+    // Current path ka parent submenu open rakho – ek hi submenu open (accordion)
     useEffect(() => {
         const pathParts = location.pathname.split('/').filter(Boolean);
-        if (pathParts.length > 1) {
-            const parentKey = `nav-${pathParts[0]}`;
-            setOpenKeys((prev) => (prev.includes(parentKey) ? prev : [...prev, parentKey]));
+        if (pathParts.length >= 1) {
+            const parentKey = pathParts.length > 1 ? `nav-${pathParts[0]}` : null;
+            setOpenKeys(parentKey ? [parentKey] : []);
         }
     }, [location.pathname]);
 
@@ -87,7 +87,7 @@ export const MainLayout = ({ children }) => {
         {
             key: 'nav-analytics',
             icon: <BarChartOutlined />,
-            label: 'Analytics',
+            label: 'Analytics & Revenue',
             children: [
                 { key: '/analytics/pricing-calculator', label: 'Pricing Calculator' },
                 { key: '/analytics/margins', label: 'Margin Analysis' },
@@ -274,7 +274,7 @@ export const MainLayout = ({ children }) => {
         {
             key: 'nav-analytics',
             icon: <BarChartOutlined />,
-            label: 'Analytics',
+            label: 'Analytics & Revenue',
             children: [
                 { key: '/analytics/pricing-calculator', label: 'Pricing Calculator' },
                 { key: '/analytics/margins', label: 'Margin Analysis' },
@@ -344,7 +344,7 @@ export const MainLayout = ({ children }) => {
                 collapsed={sidebarCollapsed}
                 width={260}
                 collapsedWidth={80}
-                className="shadow-xl bg-slate-900 border-r border-slate-800 hidden md:block"
+                className="shadow-xl bg-slate-900 border-r border-slate-700/80 hidden md:block"
                 style={{
                     overflow: 'auto',
                     height: '100vh',
@@ -353,39 +353,39 @@ export const MainLayout = ({ children }) => {
                     top: 0,
                     bottom: 0,
                     zIndex: 101,
-                    background: '#0f172a',
+                    background: 'linear-gradient(180deg, #0f172a 0%, #0c1222 100%)',
                 }}
             >
-                <div className="h-20 flex items-center px-6 transition-all duration-300">
-                    <Link to="/dashboard" className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/40">
-                            <BoxPlotOutlined className="text-xl text-white" />
+                <div className="h-[72px] flex items-center px-5 transition-all duration-300 border-b border-slate-700/50 shrink-0">
+                    <Link to="/dashboard" className="flex items-center gap-3 w-full min-w-0">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shrink-0 bg-gradient-to-br from-blue-500 to-blue-600 border border-blue-400/20">
+                            <BoxPlotOutlined className="text-lg text-white" />
                         </div>
                         {!sidebarCollapsed && (
-                            <span className="text-white font-extrabold text-xl tracking-tight uppercase">{APP_NAME}</span>
+                            <span className="text-white font-bold text-lg tracking-tight truncate">{APP_NAME}</span>
                         )}
                     </Link>
                 </div>
-                <Menu
-                    theme="dark"
-                    mode="inline"
-                    selectedKeys={[location.pathname]}
-                    openKeys={openKeys}
-                    onOpenChange={(keys) => {
-                        // Sub-route pe ho to dropdown apne aap band na ho
-                        const pathParts = location.pathname.split('/').filter(Boolean);
-                        if (keys.length === 0 && pathParts.length > 1) return;
-                        setOpenKeys(keys);
-                    }}
-                    items={menuItems}
-                    onClick={handleMenuClick}
-                    className="bg-transparent border-none mt-4 px-2 custom-sidebar-menu"
-                    style={{ background: 'transparent' }}
-                />
+                <div className="py-3 px-2">
+                    <Menu
+                        theme="dark"
+                        mode="inline"
+                        selectedKeys={[location.pathname]}
+                        openKeys={openKeys}
+                        onOpenChange={(keys) => {
+                            const next = keys.length ? [keys[keys.length - 1]] : [];
+                            setOpenKeys(next);
+                        }}
+                        items={menuItems}
+                        onClick={handleMenuClick}
+                        className="bg-transparent border-none custom-sidebar-menu"
+                        style={{ background: 'transparent' }}
+                    />
+                </div>
             </Sider>
 
             <Layout className="transition-all duration-300" style={{ marginLeft: sidebarCollapsed ? 80 : 260 }}>
-                <Header className="bg-white/80 backdrop-blur-md shadow-sm px-6 flex items-center justify-between h-16 sticky top-0 z-[100] border-b border-gray-100">
+                <Header className="bg-white/90 backdrop-blur-md shadow-sm px-6 flex items-center justify-between h-16 sticky top-0 z-[100] border-b border-gray-100">
                     <div className="flex items-center gap-6">
                         <Button
                             type="text"
@@ -416,8 +416,8 @@ export const MainLayout = ({ children }) => {
                                     {user?.name?.charAt(0) || 'U'}
                                 </Avatar>
                                 <div className="hidden sm:block leading-tight">
-                                    <div className="text-sm font-bold text-gray-800">{user?.name || 'Guest User'}</div>
-                                    <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">{user?.role?.replace('_', ' ') || 'No Role'}</div>
+                                    <div className="text-sm font-semibold text-gray-800">{user?.name || 'Guest User'}</div>
+                                    <div className="text-[11px] font-medium text-blue-600 uppercase tracking-wider">{user?.role?.replace('_', ' ') || 'No Role'}</div>
                                 </div>
                             </div>
                         </Dropdown>

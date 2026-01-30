@@ -12,6 +12,7 @@ const inventoryController = require('./controllers/inventoryController');
 const { authenticate, requireSuperAdmin, requireRole } = require('./middlewares/auth');
 const dashboardController = require('./controllers/dashboardController');
 const reportController = require('./controllers/reportController');
+const analyticsController = require('./controllers/analyticsController');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -42,6 +43,10 @@ app.get('/api/reports/:id', authenticate, requireRole(...dashboardRoles), report
 app.post('/api/reports', authenticate, requireRole(...dashboardRoles), reportController.create);
 app.put('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.update);
 app.delete('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.remove);
+
+// Analytics
+app.post('/api/analytics/pricing-calculate', authenticate, requireRole(...dashboardRoles), analyticsController.pricingCalculate);
+app.get('/api/analytics/margins', authenticate, requireRole(...dashboardRoles), analyticsController.marginsReport);
 
 // Super admin APIs - register first so they always work
 app.get('/api/superadmin/stats', authenticate, requireSuperAdmin, superadminController.stats);

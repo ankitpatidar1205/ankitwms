@@ -118,54 +118,57 @@ export default function SalesOrders() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center">
+            <div className="space-y-8">
+                {/* Page header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Sales Orders</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Track and fulfill omni-channel orders across all platforms</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Sales Orders</h1>
+                        <p className="text-gray-500 text-sm mt-1">Track and fulfill omni-channel orders across all platforms</p>
                     </div>
-                    <Space size="middle">
-                        <Button icon={<ReloadOutlined />} onClick={fetchOrders} className="h-10 rounded-lg">Sync Orders</Button>
+                    <Space size="middle" wrap>
+                        <Button icon={<ReloadOutlined />} onClick={fetchOrders} className="h-10 rounded-xl">Sync Orders</Button>
                         <Link to="/sales-orders/new">
-                            <Button type="primary" icon={<PlusOutlined />} size="large" className="h-12 rounded-xl shadow-lg ring-4 ring-indigo-50 bg-indigo-600 border-indigo-600">New Order</Button>
+                            <Button type="primary" icon={<PlusOutlined />} size="large" className="h-10 rounded-xl">New Order</Button>
                         </Link>
                     </Space>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-br from-indigo-50 to-white">
-                        <div className="text-indigo-600 font-bold text-[10px] uppercase mb-1">Incoming Flow</div>
-                        <div className="text-2xl font-black text-slate-800">{orders.length} <span className="text-xs text-indigo-400 font-normal">Active Orders</span></div>
+                {/* Stats cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-blue-600 text-xs font-medium mb-1">Active Orders</div>
+                        <div className="text-xl font-bold text-slate-800">{orders.length}</div>
                     </Card>
-                    <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-br from-orange-50 to-white">
-                        <div className="text-orange-500 font-bold text-[10px] uppercase mb-1">Critical Priority</div>
-                        <div className="text-2xl font-black text-slate-800">{orders.filter(o => o.priority === 'HIGH' || o.priority === 'URGENT').length} <span className="text-xs text-orange-400 font-normal">Urgent Items</span></div>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-orange-500 text-xs font-medium mb-1">Urgent Priority</div>
+                        <div className="text-xl font-bold text-slate-800">{orders.filter(o => o.priority === 'HIGH' || o.priority === 'URGENT').length}</div>
                     </Card>
-                    <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-br from-green-50 to-white">
-                        <div className="text-green-600 font-bold text-[10px] uppercase mb-1">Delivered Hub</div>
-                        <div className="text-2xl font-black text-slate-800">{orders.filter(o => ['SHIPPED', 'DELIVERED'].includes((o.status || '').toUpperCase())).length} <span className="text-xs text-green-400 font-normal">Dispatched</span></div>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-green-600 text-xs font-medium mb-1">Dispatched</div>
+                        <div className="text-xl font-bold text-slate-800">{orders.filter(o => ['SHIPPED', 'DELIVERED'].includes((o.status || '').toUpperCase())).length}</div>
                     </Card>
-                    <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-br from-blue-50 to-white">
-                        <div className="text-blue-600 font-bold text-[10px] uppercase mb-1">Total GMC</div>
-                        <div className="text-2xl font-black text-slate-800">{formatCurrency(orders.reduce((s, o) => s + (Number(o.totalAmount) || 0), 0))}</div>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-slate-600 text-xs font-medium mb-1">Total Value</div>
+                        <div className="text-xl font-bold text-slate-800">{formatCurrency(orders.reduce((s, o) => s + (Number(o.totalAmount) || 0), 0))}</div>
                     </Card>
                 </div>
 
-                <Card className="rounded-2xl shadow-sm border-gray-100 overflow-hidden">
-                    <div className="mb-6 p-4 bg-slate-50 rounded-xl flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 flex-1">
-                            <Search placeholder="Order# / Customer..." className="max-w-xs h-10 shadow-sm" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} />
-                            <Select value={channelFilter} onChange={setChannelFilter} className="w-48 h-10 shadow-sm">
-                                <Select.Option value="all">All Channels</Select.Option>
-                                <Select.Option value="AMAZON_FBA">Amazon FBA</Select.Option>
-                                <Select.Option value="SHOPIFY">Shopify Store</Select.Option>
-                                <Select.Option value="EBAY">eBay Global</Select.Option>
-                                <Select.Option value="DIRECT">Direct Sales</Select.Option>
-                            </Select>
+                {/* Filters + Table */}
+                <Card className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="p-4 bg-gray-50/80 rounded-t-xl border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-3 flex-1 flex-wrap">
+                            <Search placeholder="Order# / Customer..." className="max-w-xs" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} allowClear />
+                            <Select value={channelFilter} onChange={setChannelFilter} className="w-40" options={[
+                                { value: 'all', label: 'All Channels' },
+                                { value: 'AMAZON_FBA', label: 'Amazon FBA' },
+                                { value: 'SHOPIFY', label: 'Shopify Store' },
+                                { value: 'EBAY', label: 'eBay Global' },
+                                { value: 'DIRECT', label: 'Direct Sales' },
+                            ]} />
                         </div>
-                        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} className="sales-tabs flex-1" />
+                        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} className="min-w-0" />
                     </div>
-                    <Table columns={columns} dataSource={filteredOrders} rowKey="id" loading={loading} pagination={{ pageSize: 20 }} />
+                    <Table columns={columns} dataSource={filteredOrders} rowKey="id" loading={loading} pagination={{ pageSize: 20 }} className="px-4" />
                 </Card>
             </div>
         </MainLayout>

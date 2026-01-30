@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Input, Select, Tag, Card, Modal, Form, Row, Col, Space, Avatar, message } from 'antd';
-import { PlusOutlined, SearchOutlined, UserOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Select, Tag, Card, Modal, Form, Row, Col, Space, Avatar, message, Popconfirm, Drawer, Tabs } from 'antd';
+import { PlusOutlined, SearchOutlined, UserOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, EyeOutlined, TeamOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { MainLayout } from '../components/layout/MainLayout';
 import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../api/client';
-
-const { Search } = Input;
-const { Option } = Select;
 
 const STAFF_ROLES = [
     { value: 'warehouse_manager', label: 'Warehouse Manager' },
@@ -21,6 +18,8 @@ const SUPER_ADMIN_ROLES = [
     ...STAFF_ROLES,
 ];
 
+const ALL_ROLES = [...new Set([...SUPER_ADMIN_ROLES.map(r => r.value)])];
+
 export default function Users() {
     const { token, user: currentUser } = useAuthStore();
     const [loading, setLoading] = useState(false);
@@ -28,8 +27,12 @@ export default function Users() {
     const [warehouses, setWarehouses] = useState([]);
     const [companies, setCompanies] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
+    const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [searchText, setSearchText] = useState('');
+    const [roleFilter, setRoleFilter] = useState(undefined);
+    const [warehouseFilter, setWarehouseFilter] = useState(undefined);
+    const [activeTab, setActiveTab] = useState('all');
     const [submitLoading, setSubmitLoading] = useState(false);
     const [companiesLoading, setCompaniesLoading] = useState(false);
     const [form] = Form.useForm();
@@ -41,9 +44,10 @@ export default function Users() {
         try {
             setLoading(true);
             const data = await apiRequest('/api/users', { method: 'GET' }, token);
-            setUsers(Array.isArray(data.data) ? data.data : data.data || []);
+            const list = Array.isArray(data?.data) ? data.data : (data?.data ? [].concat(data.data) : []);
+            setUsers(list);
         } catch (err) {
-            message.error(err.message || 'Failed to load users');
+            message.error(err?.message || 'Failed to load users');
             setUsers([]);
         } finally {
             setLoading(false);
@@ -58,17 +62,12 @@ export default function Users() {
                 const data = await apiRequest('/api/superadmin/companies', { method: 'GET' }, token);
                 const list = Array.isArray(data?.data) ? data.data : (data?.data ? [].concat(data.data) : []);
                 setCompanies(list);
-            } else {
-                const data = await apiRequest('/api/warehouses', { method: 'GET' }, token);
-                setWarehouses(Array.isArray(data.data) ? data.data : data.data || []);
             }
+            const whRes = await apiRequest('/api/warehouses', { method: 'GET' }, token);
+            setWarehouses(Array.isArray(whRes?.data) ? whRes.data : whRes?.data || []);
         } catch (err) {
-            if (isSuperAdmin) {
-                setCompanies([]);
-                message.error(err.message || 'Companies list load nahi hui. Company Management se pehle company add karo.');
-            } else {
-                setWarehouses([]);
-            }
+            if (isSuperAdmin) setCompanies([]);
+            setWarehouses([]);
         } finally {
             setCompaniesLoading(false);
         }
@@ -82,6 +81,7 @@ export default function Users() {
     }, [token, fetchUsers, fetchDependencies]);
 
     const handleSubmit = async (values) => {
+        if (!token) return;
         try {
             const payload = { name: values.name, email: (values.email || '').trim().toLowerCase(), status: values.status || 'ACTIVE' };
             if (values.password) payload.password = values.password;
@@ -89,7 +89,7 @@ export default function Users() {
                 payload.role = values.role || 'company_admin';
                 payload.companyId = values.companyId;
                 if (!payload.companyId) {
-                    message.error('Pehle company select karo.');
+                    message.error('Select a company.');
                     return;
                 }
             } else {
@@ -102,31 +102,34 @@ export default function Users() {
                 message.success('User updated successfully');
             } else {
                 if (!payload.password || payload.password.length < 6) {
-                    message.error('Password kam se kam 6 characters hona chahiye.');
+                    message.error('Password must be at least 6 characters.');
                     setSubmitLoading(false);
                     return;
                 }
                 await apiRequest('/api/users', { method: 'POST', body: JSON.stringify(payload) }, token);
-                message.success('User add ho gaya!');
+                message.success('User added');
             }
             setModalOpen(false);
             form.resetFields();
             setSelectedUser(null);
             fetchUsers();
         } catch (err) {
-            message.error(err.message || 'User save nahi hua. Check: company select kiya? Email unique hai?');
+            message.error(err?.message || 'Failed to save user');
         } finally {
             setSubmitLoading(false);
         }
     };
 
     const handleDelete = async (id) => {
+        if (!token) return;
         try {
             await apiRequest(`/api/users/${id}`, { method: 'DELETE' }, token);
             message.success('User deleted');
+            setViewDrawerOpen(false);
+            setSelectedUser(null);
             fetchUsers();
         } catch (err) {
-            message.error(err.message || 'Failed to delete');
+            message.error(err?.message || 'Failed to delete');
         }
     };
 
@@ -136,9 +139,6 @@ export default function Users() {
         form.setFieldsValue({ status: 'ACTIVE', ...(isSuperAdmin ? { role: 'company_admin' } : {}) });
         if (isSuperAdmin) fetchDependencies();
         setModalOpen(true);
-        if (isSuperAdmin && companies.length === 0 && !companiesLoading) {
-            message.info('Pehle Company Management se ek company add karo, phir yahan company select karke user add karo.');
-        }
     };
 
     const openEdit = (r) => {
@@ -154,133 +154,179 @@ export default function Users() {
         setModalOpen(true);
     };
 
+    const openView = (r) => {
+        setSelectedUser(r);
+        setViewDrawerOpen(true);
+    };
+
+    const listUsers = users.filter(u => (u.role || '').toLowerCase() !== 'super_admin');
+    const filtered = listUsers.filter(u => {
+        if (searchText && !(u.name || '').toLowerCase().includes(searchText.toLowerCase()) && !(u.email || '').toLowerCase().includes(searchText.toLowerCase())) return false;
+        if (roleFilter && (u.role || '') !== roleFilter) return false;
+        if (warehouseFilter && (u.warehouseId || u.Warehouse?.id) !== warehouseFilter) return false;
+        if (activeTab === 'active' && (u.status || '').toUpperCase() !== 'ACTIVE') return false;
+        if (activeTab === 'inactive' && (u.status || '').toUpperCase() === 'ACTIVE') return false;
+        if (activeTab === 'admins' && !(u.role || '').toLowerCase().includes('admin')) return false;
+        return true;
+    });
+
+    const totalCount = listUsers.length;
+    const activeCount = listUsers.filter(u => (u.status || '').toUpperCase() === 'ACTIVE').length;
+    const inactiveCount = listUsers.filter(u => (u.status || '').toUpperCase() !== 'ACTIVE').length;
+    const adminsCount = listUsers.filter(u => (u.role || '').toLowerCase().includes('admin')).length;
+    const rolesCount = ALL_ROLES.length;
+
     const columns = [
         {
             title: 'User',
             key: 'user',
+            width: 220,
             render: (_, r) => (
                 <div className="flex items-center gap-3">
-                    <Avatar icon={<UserOutlined />} className="bg-slate-100 text-slate-400" />
+                    <Avatar icon={<UserOutlined />} className="bg-blue-50 text-blue-500" />
                     <div>
-                        <div className="font-semibold text-slate-800">{r.name}</div>
+                        <div className="font-medium text-gray-900">{r.name}</div>
                         <div className="text-xs text-gray-500">{r.email}</div>
                     </div>
                 </div>
             ),
         },
-        {
-            title: 'Role',
-            dataIndex: 'role',
-            key: 'role',
-            render: (role) => <Tag color={role?.toLowerCase?.().includes('admin') ? 'red' : 'blue'} className="uppercase text-[10px]">{role?.replace(/_/g, ' ')}</Tag>,
-        },
-        {
-            title: 'Company',
-            key: 'company',
-            render: (_, r) => <span className="text-sm text-slate-600">{r.Company?.name || '—'}</span>,
-        },
-        {
-            title: 'Warehouse',
-            key: 'wh',
-            render: (_, r) => <span className="text-sm text-slate-600">{r.Warehouse?.name || '—'}</span>,
-        },
-        {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-            render: (v) => <Tag color={v === 'ACTIVE' ? 'green' : 'orange'} className="uppercase text-[9px]">{v || 'ACTIVE'}</Tag>,
-        },
+        { title: 'Role', dataIndex: 'role', key: 'role', width: 150, render: (role) => <Tag color={role?.toLowerCase?.().includes('admin') ? 'red' : 'blue'}>{role?.replace(/_/g, ' ') || '—'}</Tag> },
+        { title: 'Company', key: 'company', width: 140, render: (_, r) => <span className="text-sm text-gray-600">{r.Company?.name || '—'}</span> },
+        { title: 'Warehouse', key: 'wh', width: 140, render: (_, r) => <span className="text-sm text-gray-600">{r.Warehouse?.name || '—'}</span> },
+        { title: 'Status', dataIndex: 'status', key: 'status', width: 100, render: (v) => <Tag color={(v || 'ACTIVE') === 'ACTIVE' ? 'green' : 'orange'}>{v || 'ACTIVE'}</Tag> },
         {
             title: 'Actions',
             key: 'act',
+            width: 180,
+            fixed: 'right',
             render: (_, r) => (
-                <Space>
-                    <Button type="text" icon={<EditOutlined className="text-blue-500" />} onClick={() => openEdit(r)} />
-                    <Button type="text" icon={<SafetyOutlined className="text-amber-500" />} title="Security" />
-                    <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(r.id)} />
+                <Space size="small" wrap>
+                    <Button type="link" size="small" icon={<EyeOutlined />} className="p-0 text-blue-600" onClick={() => openView(r)}>View</Button>
+                    <Button type="link" size="small" icon={<EditOutlined />} className="p-0 text-blue-600" onClick={() => openEdit(r)}>Edit</Button>
+                    <Popconfirm title="Delete this user?" okText="Yes" cancelText="No" onConfirm={() => handleDelete(r.id)}>
+                        <Button type="link" size="small" danger icon={<DeleteOutlined />} className="p-0">Delete</Button>
+                    </Popconfirm>
                 </Space>
             ),
         },
     ];
 
-    const filtered = users
-        .filter(u => (u.role || '').toLowerCase() !== 'super_admin')
-        .filter(u =>
-            (u.name || '').toLowerCase().includes(searchText.toLowerCase()) ||
-            (u.email || '').toLowerCase().includes(searchText.toLowerCase())
-        );
+    const tabContent = (
+        <>
+            <div className="flex flex-wrap items-center gap-3 px-0 py-4 border-b border-gray-100">
+                <Input placeholder="Search users..." prefix={<SearchOutlined />} value={searchText} onChange={e => setSearchText(e.target.value)} className="w-56 rounded-lg" allowClear />
+                <Select placeholder="Role" allowClear value={roleFilter} onChange={setRoleFilter} className="w-40 rounded-lg" options={[...STAFF_ROLES, ...(isSuperAdmin ? [{ value: 'company_admin', label: 'Company Admin' }] : [])]} />
+                <Select placeholder="Warehouse" allowClear value={warehouseFilter} onChange={setWarehouseFilter} className="w-44 rounded-lg" options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
+                <Button icon={<ReloadOutlined />} onClick={fetchUsers} loading={loading} className="rounded-lg">Refresh</Button>
+            </div>
+            <Table columns={columns} dataSource={filtered} rowKey="id" loading={loading} pagination={{ showSizeChanger: true, showTotal: t => `Total ${t} users`, pageSize: 10 }} scroll={{ x: 900 }} locale={{ emptyText: 'No data' }} className="[&_.ant-table-thead_th]:font-normal" />
+        </>
+    );
 
     return (
         <MainLayout>
             <div className="space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">User Management</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">
-                            {isSuperAdmin ? 'Add Company Admin under a company' : 'Add staff (Warehouse Manager, Inventory Manager, Picker, Packer, Viewer)'}
-                        </p>
+                        <h1 className="text-2xl font-semibold text-blue-600">User Management</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">Manage user accounts, roles, and permissions</p>
                     </div>
-                    <Button type="primary" icon={<PlusOutlined />} size="large" className="h-12 px-6 rounded-xl bg-indigo-600 border-indigo-600 shadow-md font-bold" onClick={openAdd}>
-                        Add User
-                    </Button>
+                    <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={openAdd}>+ Add User</Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Users</div><div className="text-3xl font-black">{users.filter(u => (u.role || '').toLowerCase() !== 'super_admin').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-green-500 uppercase mb-1">Online Now</div><div className="text-3xl font-black">12</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-blue-500 uppercase mb-1">Admin Users</div><div className="text-3xl font-black">{users.filter(u => (u.role || '').toLowerCase() !== 'super_admin' && u.role?.toLowerCase?.().includes('admin')).length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm text-red-500"><div className="text-[10px] font-black uppercase mb-1">Security Flags</div><div className="text-3xl font-black">0</div></Card>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">Total Users</div>
+                        <div className="text-xl font-medium text-blue-600">{totalCount}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">Active Users</div>
+                        <div className="text-xl font-medium text-green-600">{activeCount}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">Available Roles</div>
+                        <div className="text-xl font-medium text-purple-600">{rolesCount}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">Warehouses</div>
+                        <div className="text-xl font-medium text-orange-600">{warehouses.length}</div>
+                    </Card>
                 </div>
 
-                <Card className="rounded-[2.5rem] shadow-sm border-gray-100 overflow-hidden">
-                    <div className="p-8">
-                        <div className="mb-8 flex items-center justify-between">
-                            <Search placeholder="Search by name, email..." className="max-w-md h-12 shadow-sm rounded-xl" prefix={<SearchOutlined />} value={searchText} onChange={e => setSearchText(e.target.value)} />
-                            <Button icon={<ReloadOutlined />} onClick={fetchUsers} />
-                        </div>
-                        <Table columns={columns} dataSource={filtered} rowKey="id" loading={loading} />
-                    </div>
+                <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
+                    <Tabs
+                        activeKey={activeTab}
+                        onChange={setActiveTab}
+                        className="px-4 pt-2 [&_.ant-tabs-nav]:mb-0"
+                        items={[
+                            { key: 'all', label: <span className="flex items-center gap-2"><TeamOutlined /> All Users ({totalCount})</span>, children: tabContent },
+                            { key: 'active', label: <span className="flex items-center gap-2"><UserOutlined /> Active ({activeCount})</span>, children: tabContent },
+                            { key: 'inactive', label: <span className="flex items-center gap-2"><ClockCircleOutlined /> Inactive ({inactiveCount})</span>, children: tabContent },
+                            { key: 'admins', label: <span className="flex items-center gap-2"><UserOutlined /> Admins ({adminsCount})</span>, children: tabContent },
+                        ]}
+                    />
                 </Card>
 
-                <Modal title={selectedUser ? 'Edit User' : (isSuperAdmin ? 'Add Company Admin' : 'Add User')} open={modalOpen} onCancel={() => { setModalOpen(false); setSelectedUser(null); }} onOk={() => form.submit()} okButtonProps={{ loading: submitLoading }} width={700} className="user-modal">
-                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-6">
+                <Modal title={selectedUser ? 'Edit User' : (isSuperAdmin ? 'Add Company Admin' : 'Add User')} open={modalOpen} onCancel={() => { setModalOpen(false); setSelectedUser(null); }} footer={null} width={600} className="rounded-xl" destroyOnClose>
+                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-4">
                         <Row gutter={16}>
-                            <Col span={12}><Form.Item label="Name" name="name" rules={[{ required: true }]}><Input placeholder="Full name" className="h-11 rounded-xl" /></Form.Item></Col>
-                            <Col span={12}><Form.Item label="Email" name="email" rules={[{ required: true, type: 'email' }]}><Input placeholder="user@company.com" className="h-11 rounded-xl" /></Form.Item></Col>
+                            <Col span={12}><Form.Item label="Name" name="name" rules={[{ required: true }]}><Input placeholder="Full name" className="rounded-lg" /></Form.Item></Col>
+                            <Col span={12}><Form.Item label="Email" name="email" rules={[{ required: true, type: 'email' }]}><Input placeholder="user@company.com" className="rounded-lg" /></Form.Item></Col>
                         </Row>
-                        {!selectedUser && (
-                            <Form.Item label="Password" name="password" rules={[{ required: true, min: 6, message: 'Min 6 characters' }]}><Input.Password placeholder="Min 6 characters" className="h-11 rounded-xl" /></Form.Item>
-                        )}
+                        {!selectedUser && <Form.Item label="Password" name="password" rules={[{ required: true, min: 6, message: 'Min 6 characters' }]}><Input.Password placeholder="Min 6 characters" className="rounded-lg" /></Form.Item>}
                         {isSuperAdmin ? (
                             <>
-                                <Form.Item label="Role" name="role" rules={[{ required: true, message: 'Role select karo' }]} initialValue="company_admin">
-                                    <Select placeholder="Select role" className="h-11 rounded-xl" optionFilterProp="label">
-                                        {SUPER_ADMIN_ROLES.map(r => <Option key={r.value} value={r.value} label={r.label}>{r.label}</Option>)}
-                                    </Select>
+                                <Form.Item label="Role" name="role" rules={[{ required: true }]} initialValue="company_admin">
+                                    <Select placeholder="Select role" className="rounded-lg" optionFilterProp="label" options={SUPER_ADMIN_ROLES} />
                                 </Form.Item>
-                                <Form.Item label="Company" name="companyId" rules={[{ required: !selectedUser, message: 'Company select karo' }]} extra={!selectedUser && companies.length === 0 ? 'Pehle Company Management se company add karo.' : null}>
-                                    <Select placeholder={companiesLoading ? 'Loading...' : ((Array.isArray(companies) ? companies : []).length === 0 ? 'Pehle company add karo' : 'Company select karo')} loading={companiesLoading} className="h-11 rounded-xl" allowClear disabled={!!selectedUser} optionFilterProp="label">
-                                        {(Array.isArray(companies) ? companies : []).map(c => <Option key={c.id} value={c.id} label={c.name}>{c.name} ({c.code})</Option>)}
-                                    </Select>
+                                <Form.Item label="Company" name="companyId" rules={[{ required: !selectedUser, message: 'Select company' }]}>
+                                    <Select placeholder={companiesLoading ? 'Loading...' : 'Select company'} loading={companiesLoading} className="rounded-lg" allowClear disabled={!!selectedUser} optionFilterProp="label" options={companies.map(c => ({ value: c.id, label: `${c.name} (${c.code})` }))} />
                                 </Form.Item>
                             </>
                         ) : (
                             <>
                                 <Form.Item label="Role" name="role" rules={[{ required: true }]}>
-                                    <Select placeholder="Select role" className="h-11 rounded-xl">
-                                        {STAFF_ROLES.map(r => <Option key={r.value} value={r.value}>{r.label}</Option>)}
-                                    </Select>
+                                    <Select placeholder="Select role" className="rounded-lg" options={STAFF_ROLES} />
                                 </Form.Item>
                                 <Form.Item label="Warehouse" name="warehouseId">
-                                    <Select className="h-11 rounded-xl" allowClear placeholder="Optional">
-                                        {(Array.isArray(warehouses) ? warehouses : []).map(w => <Option key={w.id} value={w.id}>{w.name}</Option>)}
-                                    </Select>
+                                    <Select className="rounded-lg" allowClear placeholder="Optional" options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
                                 </Form.Item>
                             </>
                         )}
-                        <Form.Item label="Status" name="status" initialValue="ACTIVE"><Select className="h-11 rounded-xl"><Option value="ACTIVE">Active</Option><Option value="SUSPENDED">Suspended</Option></Select></Form.Item>
+                        <Form.Item label="Status" name="status" initialValue="ACTIVE">
+                            <Select className="rounded-lg" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'SUSPENDED', label: 'Suspended' }]} />
+                        </Form.Item>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button onClick={() => { setModalOpen(false); setSelectedUser(null); }} className="rounded-lg">Cancel</Button>
+                            <Button type="primary" htmlType="submit" loading={submitLoading} className="bg-blue-600 border-blue-600 rounded-lg">Save</Button>
+                        </div>
                     </Form>
                 </Modal>
+
+                <Drawer title="User details" width={400} open={viewDrawerOpen} onClose={() => { setViewDrawerOpen(false); setSelectedUser(null); }} className="rounded-l-xl" destroyOnClose>
+                    {selectedUser && (
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <Avatar icon={<UserOutlined />} size={56} className="bg-blue-50 text-blue-500" />
+                                <div>
+                                    <div className="font-semibold text-gray-900">{selectedUser.name}</div>
+                                    <div className="text-sm text-gray-500">{selectedUser.email}</div>
+                                </div>
+                            </div>
+                            <div><span className="text-gray-500 text-sm block">Role</span><Tag color="blue">{selectedUser.role?.replace(/_/g, ' ') || '—'}</Tag></div>
+                            <div><span className="text-gray-500 text-sm block">Company</span><div className="font-medium">{selectedUser.Company?.name || '—'}</div></div>
+                            <div><span className="text-gray-500 text-sm block">Warehouse</span><div className="font-medium">{selectedUser.Warehouse?.name || '—'}</div></div>
+                            <div><span className="text-gray-500 text-sm block">Status</span><Tag color={selectedUser.status === 'ACTIVE' ? 'green' : 'orange'}>{selectedUser.status || 'ACTIVE'}</Tag></div>
+                            <div className="flex gap-2 pt-4 border-t">
+                                <Button type="primary" icon={<EditOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setViewDrawerOpen(false); openEdit(selectedUser); }}>Edit</Button>
+                                <Popconfirm title="Delete this user?" okText="Yes" cancelText="No" onConfirm={() => handleDelete(selectedUser.id)}>
+                                    <Button danger icon={<DeleteOutlined />} className="rounded-lg">Delete</Button>
+                                </Popconfirm>
+                            </div>
+                        </div>
+                    )}
+                </Drawer>
             </div>
         </MainLayout>
     );

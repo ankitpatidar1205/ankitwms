@@ -120,82 +120,110 @@ export default function CompanyDashboard() {
         fill: CHART_COLORS[i % CHART_COLORS.length],
     }));
 
-    if (loading) return <MainLayout><div className="flex justify-center items-center min-h-[200px]"><Spin size="large" /></div></MainLayout>;
+    if (loading) {
+        return (
+            <MainLayout>
+                <div className="flex flex-col justify-center items-center min-h-[320px] gap-4">
+                    <Spin size="large" />
+                    <p className="text-gray-500 text-sm font-medium">Loading dashboard…</p>
+                </div>
+            </MainLayout>
+        );
+    }
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-3">
-                        <ShopOutlined className="text-blue-500" /> Company Dashboard
-                    </h1>
-                    <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose mt-1">
-                        Overview • Users • Warehouses • Orders
-                    </p>
+            <div className="space-y-8">
+                {/* Page header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-3">
+                            <span className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                                <ShopOutlined className="text-lg" />
+                            </span>
+                            Company Dashboard
+                        </h1>
+                        <p className="text-gray-500 text-sm mt-1">
+                            Overview of users, warehouses, and orders
+                        </p>
+                    </div>
                 </div>
 
-                <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Warehouses" value={companyStats.warehouses} icon={<HomeOutlined />} />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Active Users" value={companyStats.users} icon={<TeamOutlined />} />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Products" value={companyStats.products} icon={<AppstoreOutlined />} />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Pending Orders" value={companyStats.pendingOrders} icon={<ShoppingCartOutlined />} />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Customers" value={companyStats.customers} icon={<TeamOutlined />} />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Picking Pending" value={companyStats.pickingPendingCount} icon={<BoxPlotOutlined />} />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Packing Pending" value={companyStats.packingPendingCount} icon={<InboxOutlined />} />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard title="Low Stock Alerts" value={companyStats.lowStockCount} icon={<AppstoreOutlined />} />
-                    </Col>
-                </Row>
+                {/* Key metrics */}
+                <div>
+                    <h2 className="text-base font-semibold text-slate-700 mb-4">Key metrics</h2>
+                    <Row gutter={[16, 16]}>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Warehouses" value={companyStats.warehouses} icon={<HomeOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Active Users" value={companyStats.users} icon={<TeamOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Products" value={companyStats.products} icon={<AppstoreOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Pending Orders" value={companyStats.pendingOrders} icon={<ShoppingCartOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Customers" value={companyStats.customers} icon={<TeamOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Picking Pending" value={companyStats.pickingPendingCount} icon={<BoxPlotOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Packing Pending" value={companyStats.packingPendingCount} icon={<InboxOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Low Stock Alerts" value={companyStats.lowStockCount} icon={<AppstoreOutlined />} />
+                        </Col>
+                    </Row>
+                </div>
 
-                <Card title={<span className="font-black uppercase tracking-tight">Quick Links</span>} className="rounded-2xl shadow-sm border-slate-100">
+                {/* Quick Links */}
+                <div>
+                    <h2 className="text-base font-semibold text-slate-700 mb-4">Quick links</h2>
                     <Row gutter={[16, 16]}>
                         {quickLinks.map((link, i) => (
                             <Col xs={24} sm={12} md={6} key={i}>
-                                <Link to={link.to}>
-                                    <Card size="small" className="rounded-xl border-slate-100 hover:border-blue-300 hover:shadow-md transition-all h-full">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                <Link to={link.to} className="block h-full">
+                                    <Card
+                                        size="small"
+                                        className="h-full rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:shadow-md transition-all duration-200"
+                                        bodyStyle={{ padding: '16px' }}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
                                                 {link.icon}
                                             </div>
-                                            <div>
-                                                <div className="font-bold text-slate-800">{link.label}</div>
-                                                <div className="text-xs text-gray-500">{link.desc}</div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-semibold text-slate-800">{link.label}</div>
+                                                <div className="text-xs text-gray-500 mt-0.5">{link.desc}</div>
                                             </div>
-                                            <ArrowRightOutlined className="text-gray-400 ml-auto" />
+                                            <ArrowRightOutlined className="text-gray-400 shrink-0" />
                                         </div>
                                     </Card>
                                 </Link>
                             </Col>
                         ))}
                     </Row>
-                </Card>
+                </div>
 
-                {/* Charts Section */}
+                {/* Charts & Analytics */}
                 <div className="space-y-6">
-                    <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                        <BarChartOutlined /> Charts & Analytics
+                    <h2 className="text-base font-semibold text-slate-700 flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                            <BarChartOutlined />
+                        </span>
+                        Charts & analytics
                     </h2>
 
                     <Row gutter={[16, 16]}>
                         {/* Orders trend - Area chart */}
                         <Col xs={24} lg={16}>
                             <Card
-                                title={<span className="font-bold flex items-center gap-2"><LineChartOutlined /> Orders trend (last 14 days)</span>}
-                                className="rounded-2xl shadow-sm border-slate-100"
+                                title={<span className="font-semibold text-slate-800 flex items-center gap-2"><LineChartOutlined className="text-blue-500" /> Orders trend (last 14 days)</span>}
+                                className="rounded-xl border border-gray-100 shadow-sm"
                                 loading={chartsLoading}
                             >
                                 {chartData.ordersByDay.length > 0 ? (
@@ -220,7 +248,7 @@ export default function CompanyDashboard() {
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 ) : (
-                                    <div className="h-[320px] flex items-center justify-center text-gray-400 font-medium">No order data for the last 14 days</div>
+                                    <div className="h-[320px] flex items-center justify-center text-gray-400 text-sm">No order data for the last 14 days</div>
                                 )}
                             </Card>
                         </Col>
@@ -228,8 +256,8 @@ export default function CompanyDashboard() {
                         {/* Orders by status - Pie */}
                         <Col xs={24} lg={8}>
                             <Card
-                                title={<span className="font-bold flex items-center gap-2"><PieChartOutlined /> Orders by status</span>}
-                                className="rounded-2xl shadow-sm border-slate-100"
+                                title={<span className="font-semibold text-slate-800 flex items-center gap-2"><PieChartOutlined className="text-blue-500" /> Orders by status</span>}
+                                className="rounded-xl border border-gray-100 shadow-sm"
                                 loading={chartsLoading}
                             >
                                 {pieData.length > 0 ? (
@@ -255,7 +283,7 @@ export default function CompanyDashboard() {
                                         </PieChart>
                                     </ResponsiveContainer>
                                 ) : (
-                                    <div className="h-[320px] flex items-center justify-center text-gray-400 font-medium">No order status data</div>
+                                    <div className="h-[320px] flex items-center justify-center text-gray-400 text-sm">No order status data</div>
                                 )}
                             </Card>
                         </Col>
@@ -263,8 +291,8 @@ export default function CompanyDashboard() {
                         {/* Stock by warehouse - Bar */}
                         <Col xs={24} lg={12}>
                             <Card
-                                title={<span className="font-bold flex items-center gap-2"><BarChartOutlined /> Stock by warehouse</span>}
-                                className="rounded-2xl shadow-sm border-slate-100"
+                                title={<span className="font-semibold text-slate-800 flex items-center gap-2"><BarChartOutlined className="text-blue-500" /> Stock by warehouse</span>}
+                                className="rounded-xl border border-gray-100 shadow-sm"
                                 loading={chartsLoading}
                             >
                                 {chartData.stockByWarehouse.length > 0 ? (
@@ -278,7 +306,7 @@ export default function CompanyDashboard() {
                                         </BarChart>
                                     </ResponsiveContainer>
                                 ) : (
-                                    <div className="h-[300px] flex items-center justify-center text-gray-400 font-medium">No warehouse stock data</div>
+                                    <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">No warehouse stock data</div>
                                 )}
                             </Card>
                         </Col>
@@ -286,8 +314,8 @@ export default function CompanyDashboard() {
                         {/* Top products by stock - Bar */}
                         <Col xs={24} lg={12}>
                             <Card
-                                title={<span className="font-bold flex items-center gap-2"><AppstoreOutlined /> Top 10 products by stock</span>}
-                                className="rounded-2xl shadow-sm border-slate-100"
+                                title={<span className="font-semibold text-slate-800 flex items-center gap-2"><AppstoreOutlined className="text-blue-500" /> Top 10 products by stock</span>}
+                                className="rounded-xl border border-gray-100 shadow-sm"
                                 loading={chartsLoading}
                             >
                                 {chartData.topProducts.length > 0 ? (
@@ -301,7 +329,7 @@ export default function CompanyDashboard() {
                                         </BarChart>
                                     </ResponsiveContainer>
                                 ) : (
-                                    <div className="h-[300px] flex items-center justify-center text-gray-400 font-medium">No product stock data</div>
+                                    <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">No product stock data</div>
                                 )}
                             </Card>
                         </Col>

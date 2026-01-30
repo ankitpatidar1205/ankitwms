@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Form, Select, InputNumber, Button, Space, Divider, Statistic, Row, Col, Tag, message, Typography } from 'antd';
 import { CalculatorOutlined, DollarOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
@@ -27,37 +27,40 @@ export default function PricingCalculator() {
     const [products, setProducts] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
 
-    useEffect(() => {
-        if (token) {
-            fetchProducts();
-        }
-    }, [token]);
-
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         if (!token) return;
         try {
-            const data = await apiRequest('/api/inventory/products', { method: 'GET' }, token);
-            const list = Array.isArray(data?.data) ? data.data : [];
-            const productList = list.map((p) => ({ id: p.id, name: p.name, sku: p.sku, costPrice: 0, price: Number(p.price) || 0, sellingPrice: Number(p.price) || 0 }));
+            const res = await apiRequest('/api/inventory/products', { method: 'GET' }, token);
+            const list = Array.isArray(res?.data) ? res.data : [];
+            const productList = list.map((p) => ({
+                id: p.id,
+                name: p.name,
+                sku: p.sku || p.id,
+                costPrice: Number(p.costPrice) || 0,
+                price: Number(p.price) || 0,
+                sellingPrice: Number(p.price) || 0,
+            }));
             setProducts(productList);
-            if (productList.length > 0 && !selectedProduct) {
+            if (productList.length > 0) {
                 const first = productList[0];
                 setSelectedProduct(first);
                 form.setFieldsValue({
                     productId: first.id,
-                    channelType: 'Amazon_UK_FBA',
                     productCost: first.costPrice || 0,
-                    sellingPrice: first.price || 0,
+                    packagingCost: 0.25,
                     shippingCost: 3.50,
                     laborCost: 0.50,
-                    packagingCost: 0.25,
                     desiredMargin: 0.20,
                 });
             }
         } catch (_) {
             setProducts([]);
         }
-    };
+    }, [token, form]);
+
+    useEffect(() => {
+        if (token) fetchProducts();
+    }, [token, fetchProducts]);
 
     const handleProductChange = (productId) => {
         const product = products.find(p => p.id === productId);
@@ -71,26 +74,44 @@ export default function PricingCalculator() {
     };
 
     const handleCalculate = async (values) => {
+        if (!token) return;
+        setLoading(true);
         try {
-            setLoading(true);
-            // Calculate locally for instant feedback
-            const productCost = values.productCost || 0;
-            const packagingCost = values.packagingCost || 0;
-            const shippingCost = values.shippingCost || 0;
-            const laborCost = values.laborCost || 0;
-            const desiredMargin = values.desiredMargin || 0.20;
-
-            const channelConfig = CHANNELS.find(c => c.value === values.channelType) || CHANNELS[0];
+            const payload = {
+                productId: values.productId,
+                productCost: Number(values.productCost) || 0,
+                packagingCost: Number(values.packagingCost) || 0,
+                shippingCost: Number(values.shippingCost) || 0,
+                laborCost: Number(values.laborCost) || 0,
+                desiredMargin: Number(values.desiredMargin) ?? 0.20,
+            };
+            const res = await apiRequest('/api/analytics/pricing-calculate', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            }, token);
+            const data = res?.data;
+            if (data) {
+                setResult(data);
+                message.success('Price calculated successfully!');
+                return;
+            }
+            throw new Error('Invalid response');
+        } catch (err) {
+            // Fallback: calculate locally if API fails
+            const productCost = Number(values.productCost) || 0;
+            const packagingCost = Number(values.packagingCost) || 0;
+            const shippingCost = Number(values.shippingCost) || 0;
+            const laborCost = Number(values.laborCost) || 0;
+            const desiredMargin = Number(values.desiredMargin) ?? 0.20;
+            const channelConfig = CHANNELS[1];
             const feePercent = channelConfig.feePercent / 100;
             const fulfillmentFee = channelConfig.fulfillment;
-
             const baseCost = productCost + packagingCost + shippingCost + laborCost + fulfillmentFee;
             const recommendedSellingPrice = baseCost / (1 - desiredMargin - feePercent);
             const channelFee = recommendedSellingPrice * feePercent;
             const totalCost = baseCost + channelFee;
             const profit = recommendedSellingPrice - totalCost;
             const actualMargin = recommendedSellingPrice > 0 ? profit / recommendedSellingPrice : 0;
-
             setResult({
                 productCost,
                 consumablesCost: packagingCost,
@@ -102,15 +123,9 @@ export default function PricingCalculator() {
                 recommendedSellingPrice,
                 profit,
                 margin: actualMargin,
-                breakdown: {
-                    channelFeePercent: channelConfig.feePercent,
-                    fulfillmentFee: channelConfig.fulfillment,
-                }
+                breakdown: { channelFeePercent: channelConfig.feePercent, fulfillmentFee: channelConfig.fulfillment },
             });
-            message.success('Price calculated successfully!');
-        } catch (error) {
-            console.error('Failed to calculate price:', error);
-            message.error('Failed to calculate price');
+            message.success('Price calculated (offline).');
         } finally {
             setLoading(false);
         }
@@ -121,15 +136,15 @@ export default function PricingCalculator() {
             <div className="space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Pricing Calculator</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Calculate optimal selling prices with full cost breakdown</p>
+                        <h1 className="text-2xl font-semibold text-blue-600">Marketplace Price Calculator</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">Calculate optimal selling prices with full cost breakdown</p>
                     </div>
-                    <Button icon={<ReloadOutlined />} size="large" onClick={fetchProducts} className="rounded-xl">Refresh Data</Button>
+                    <Button icon={<ReloadOutlined />} onClick={fetchProducts} className="rounded-lg">Refresh</Button>
                 </div>
 
                 <Row gutter={[24, 24]}>
                     <Col xs={24} lg={12}>
-                        <Card className="rounded-[2rem] shadow-sm border-gray-100 overflow-hidden p-4">
+                        <Card title={<span className="font-semibold text-gray-800">Cost Configuration</span>} extra={<Button type="text" size="small" icon={<ReloadOutlined />} onClick={fetchProducts} />} className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
                             <Form
                                 form={form}
                                 layout="vertical"
@@ -139,12 +154,11 @@ export default function PricingCalculator() {
                                     shippingCost: 3.50,
                                     laborCost: 0.50,
                                     packagingCost: 0.25,
-                                    channelType: 'Amazon_UK_FBA',
                                 }}
                             >
                                 <Form.Item
                                     name="productId"
-                                    label={<span className="font-bold text-gray-700">TARGET PRODUCT</span>}
+                                    label={<span className="font-bold text-gray-700">* Product</span>}
                                     rules={[{ required: true, message: 'Please select a product' }]}
                                 >
                                     <Select
@@ -162,21 +176,7 @@ export default function PricingCalculator() {
                                     </Select>
                                 </Form.Item>
 
-                                <Form.Item
-                                    name="channelType"
-                                    label={<span className="font-bold text-gray-700">SALES CHANNEL</span>}
-                                    rules={[{ required: true, message: 'Please select a channel' }]}
-                                >
-                                    <Select placeholder="Select marketplace" className="h-12 rounded-xl">
-                                        {CHANNELS.map(c => (
-                                            <Option key={c.value} value={c.value}>
-                                                {c.label} ({c.feePercent}% + £{c.fulfillment.toFixed(2)})
-                                            </Option>
-                                        ))}
-                                    </Select>
-                                </Form.Item>
-
-                                <Divider><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Variable Cost Structure</span></Divider>
+                                <Divider><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Editable Costs</span></Divider>
 
                                 <Row gutter={16}>
                                     <Col span={12}>
@@ -206,7 +206,7 @@ export default function PricingCalculator() {
 
                                 <Form.Item
                                     name="desiredMargin"
-                                    label={<span className="font-bold text-gray-700">TARGET PROFIT MARGIN</span>}
+                                    label={<span className="font-bold text-gray-700">Target Profit Margin</span>}
                                 >
                                     <Select className="h-12 rounded-xl">
                                         <Option value={0.10}>10% - Low Margin</Option>
@@ -306,9 +306,8 @@ export default function PricingCalculator() {
                         ) : (
                             <Card className="rounded-[2rem] border-dashed border-2 border-gray-200 flex items-center justify-center p-20 min-h-[500px]">
                                 <div className="text-center">
-                                    <CalculatorOutlined style={{ fontSize: 64, color: '#e2e8f0' }} />
-                                    <div className="mt-4 text-gray-400 font-bold uppercase tracking-widest text-xs">Awaiting Parameters</div>
-                                    <p className="text-gray-300 text-sm mt-2 max-w-xs">Configure your product costs and target margins to generate optimal pricing protocols</p>
+                                    <CalculatorOutlined style={{ fontSize: 64, color: '#d1d5db' }} />
+                                    <p className="mt-4 text-gray-500 text-sm">Fill in the form and click Calculate to see pricing results.</p>
                                 </div>
                             </Card>
                         )}

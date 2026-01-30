@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
                             block
                             loading={loading}
                             className="h-12 text-base font-medium"
-                        >
+                        >image.png
                             Send Reset Link
                         </Button>
                     </Form.Item>
