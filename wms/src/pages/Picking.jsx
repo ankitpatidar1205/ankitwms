@@ -223,9 +223,8 @@ export default function Picking() {
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card className="rounded-2xl border-none shadow-sm bg-slate-900 text-white"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Live Queue</div><div className="text-3xl font-black">{pickLists.filter(x => (x.status || '').toUpperCase() !== 'PICKED').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Hot Zone</div><div className="text-3xl font-black">{pickLists.filter(x => x.priority === 'HIGH').length}</div></Card>
                     <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Dispatched</div><div className="text-3xl font-black">{pickLists.filter(x => (x.status || '').toUpperCase() === 'PICKED').length}</div></Card>
                     <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Units Picked</div><div className="text-3xl font-black">{pickLists.reduce((s, p) => s + ((p.PickListItems || p.pickItems || []).reduce((ss, i) => ss + (i.quantityPicked || 0), 0) || 0), 0)}</div></Card>
                 </div>
