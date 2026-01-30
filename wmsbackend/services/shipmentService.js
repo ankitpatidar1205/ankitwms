@@ -34,8 +34,9 @@ async function getById(id, reqUser) {
 async function create(data, reqUser) {
   const order = await SalesOrder.findByPk(data.salesOrderId);
   if (!order) throw new Error('Order not found');
-  if (order.status !== 'packed') throw new Error('Order must be packed first');
+  if (order.status !== 'PACKED') throw new Error('Order must be packed first');
   if (reqUser.role !== 'super_admin' && order.companyId !== reqUser.companyId) throw new Error('Order not found');
+
   const shipment = await Shipment.create({
     salesOrderId: order.id,
     companyId: order.companyId,
@@ -44,9 +45,12 @@ async function create(data, reqUser) {
     trackingNumber: data.trackingNumber || null,
     weight: data.weight || null,
     dispatchDate: data.dispatchDate || new Date().toISOString().slice(0, 10),
-    deliveryStatus: data.deliveryStatus || 'pending',
+    deliveryStatus: 'READY_TO_SHIP',
   });
-  await order.update({ status: 'shipped' });
+
+  // Requirement: READY_TO_SHIP -> Sales Order = PACKED (No change needed)
+  await order.update({ status: 'PACKED' });
+
   return getById(shipment.id, reqUser);
 }
 
@@ -54,6 +58,7 @@ async function update(id, data, reqUser) {
   const shipment = await Shipment.findByPk(id);
   if (!shipment) throw new Error('Shipment not found');
   if (reqUser.role !== 'super_admin' && shipment.companyId !== reqUser.companyId) throw new Error('Shipment not found');
+
   await shipment.update({
     courierName: data.courierName ?? shipment.courierName,
     trackingNumber: data.trackingNumber ?? shipment.trackingNumber,
@@ -61,6 +66,18 @@ async function update(id, data, reqUser) {
     dispatchDate: data.dispatchDate ?? shipment.dispatchDate,
     deliveryStatus: data.deliveryStatus ?? shipment.deliveryStatus,
   });
+
+  const order = await SalesOrder.findByPk(shipment.salesOrderId);
+
+  if (data.deliveryStatus === 'SHIPPED' || data.deliveryStatus === 'IN_TRANSIT') {
+    await order.update({ status: 'SHIPPED' });
+  } else if (data.deliveryStatus === 'DELIVERED') {
+    await order.update({ status: 'DELIVERED' });
+  } else if (data.deliveryStatus === 'FAILED' || data.deliveryStatus === 'RETURNED') {
+    // Requirement: FAILED / RETURNED -> Sales Order remains SHIPPED with issue flag (for now just SHIPPED)
+    await order.update({ status: 'SHIPPED' });
+  }
+
   return getById(id, reqUser);
 }
 

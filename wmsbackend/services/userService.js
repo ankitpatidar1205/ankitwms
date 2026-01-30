@@ -11,7 +11,12 @@ async function list(reqUser, query = {}) {
     if (query.role) where.role = query.role;
   } else if (reqUser.role === 'company_admin') {
     where.companyId = reqUser.companyId;
-    where.role = { [Op.in]: STAFF_ROLES };
+    if (query.role) {
+      if (STAFF_ROLES.includes(query.role)) where.role = query.role;
+      else where.role = { [Op.in]: STAFF_ROLES }; // Fallback or empty? Fallback to all staff seems safer or maybe empty
+    } else {
+      where.role = { [Op.in]: STAFF_ROLES };
+    }
   } else {
     return [];
   }

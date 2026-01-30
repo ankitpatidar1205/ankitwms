@@ -58,10 +58,15 @@ export default function SalesOrders() {
 
         let matchesStatus = true;
         if (activeTab !== 'all') {
-            if (activeTab === 'in_progress') {
-                matchesStatus = ['PICKING', 'PACKING', 'ALLOCATED'].includes(order.status?.toUpperCase());
-            } else {
-                matchesStatus = order.status?.toUpperCase() === activeTab.toUpperCase();
+            const s = (order.status || '').toUpperCase();
+            if (activeTab === 'pending') {
+                matchesStatus = ['DRAFT', 'CONFIRMED', 'PICK_LIST_CREATED'].includes(s);
+            } else if (activeTab === 'in_progress') {
+                matchesStatus = ['PICKING_IN_PROGRESS', 'PICKED', 'PACKING_IN_PROGRESS', 'PACKED'].includes(s);
+            } else if (activeTab === 'completed') {
+                matchesStatus = ['SHIPPED', 'DELIVERED'].includes(s);
+            } else if (activeTab === 'cancelled') {
+                matchesStatus = s === 'CANCELLED';
             }
         }
         return matchesSearch && matchesChannel && matchesStatus;
@@ -73,12 +78,12 @@ export default function SalesOrders() {
         { title: 'Channel', dataIndex: 'salesChannel', key: 'channel', render: (c) => <Tag color="blue" className="uppercase">{c || 'Direct'}</Tag> },
         { title: 'Date', dataIndex: 'orderDate', key: 'orderDate', render: (v, r) => formatDate(v || r.createdAt) },
         { title: 'Total', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => <span className="font-medium text-slate-800">{formatCurrency(v)}</span> },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={getStatusColor(s)} className="uppercase font-bold">{s}</Tag> },
+        { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={getStatusColor(s)} className="uppercase font-bold">{s === 'PICK_LIST_CREATED' ? 'CONFIRMED' : s}</Tag> },
         {
             title: 'Actions',
             key: 'actions',
             render: (_, record) => {
-                const canEditDelete = ['pending', 'pick_list_created'].includes((record.status || '').toLowerCase());
+                const canEditDelete = ['DRAFT', 'CONFIRMED'].includes((record.status || '').toUpperCase());
                 return (
                     <Space onClick={(e) => e.stopPropagation()} role="group">
                         <Button type="text" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); navigate(`/sales-orders/${record.id}`); }} title="View" />
@@ -96,12 +101,13 @@ export default function SalesOrders() {
         }
     ];
 
-    const statusLower = (s) => (s || '').toLowerCase();
+    const statusUpper = (s) => (s || '').toUpperCase();
     const tabItems = [
         { key: 'all', label: `All (${orders.length})` },
-        { key: 'pending', label: `Pending (${orders.filter(o => statusLower(o.status) === 'pending').length})` },
-        { key: 'in_progress', label: `In Progress (${orders.filter(o => ['picking', 'packing', 'pick_list_created'].includes(statusLower(o.status))).length})` },
-        { key: 'completed', label: `Completed (${orders.filter(o => ['packed', 'shipped'].includes(statusLower(o.status))).length})` },
+        { key: 'pending', label: `Pending (${orders.filter(o => ['DRAFT', 'CONFIRMED', 'PICK_LIST_CREATED'].includes(statusUpper(o.status))).length})` },
+        { key: 'in_progress', label: `In Progress (${orders.filter(o => ['PICKING_IN_PROGRESS', 'PICKED', 'PACKING_IN_PROGRESS', 'PACKED'].includes(statusUpper(o.status))).length})` },
+        { key: 'completed', label: `Completed (${orders.filter(o => ['SHIPPED', 'DELIVERED'].includes(statusUpper(o.status))).length})` },
+        { key: 'cancelled', label: `Cancelled (${orders.filter(o => statusUpper(o.status) === 'CANCELLED').length})` },
     ];
 
     return (
@@ -127,15 +133,15 @@ export default function SalesOrders() {
                     </Card>
                     <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-br from-orange-50 to-white">
                         <div className="text-orange-500 font-bold text-[10px] uppercase mb-1">Critical Priority</div>
-                        <div className="text-2xl font-black text-slate-800">{orders.filter(o => o.priority === 'HIGH').length} <span className="text-xs text-orange-400 font-normal">Urgent Items</span></div>
+                        <div className="text-2xl font-black text-slate-800">{orders.filter(o => o.priority === 'HIGH' || o.priority === 'URGENT').length} <span className="text-xs text-orange-400 font-normal">Urgent Items</span></div>
                     </Card>
                     <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-br from-green-50 to-white">
                         <div className="text-green-600 font-bold text-[10px] uppercase mb-1">Delivered Hub</div>
-                        <div className="text-2xl font-black text-slate-800">{orders.filter(o => ['packed', 'shipped'].includes((o.status || '').toLowerCase())).length} <span className="text-xs text-green-400 font-normal">Dispatched</span></div>
+                        <div className="text-2xl font-black text-slate-800">{orders.filter(o => ['SHIPPED', 'DELIVERED'].includes((o.status || '').toUpperCase())).length} <span className="text-xs text-green-400 font-normal">Dispatched</span></div>
                     </Card>
                     <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-br from-blue-50 to-white">
                         <div className="text-blue-600 font-bold text-[10px] uppercase mb-1">Total GMC</div>
-                        <div className="text-2xl font-black text-slate-800">{formatCurrency(orders.reduce((s, o) => s + (o.totalAmount || 0), 0))}</div>
+                        <div className="text-2xl font-black text-slate-800">{formatCurrency(orders.reduce((s, o) => s + (Number(o.totalAmount) || 0), 0))}</div>
                     </Card>
                 </div>
 

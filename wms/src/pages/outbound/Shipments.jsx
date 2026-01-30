@@ -21,6 +21,16 @@ export default function Shipments() {
     const [form] = Form.useForm();
     const [batchForm] = Form.useForm();
 
+    const fetchReadyOrders = useCallback(async () => {
+        if (!token) return;
+        try {
+            const data = await apiRequest('/api/orders/sales?status=PACKED', { method: 'GET' }, token);
+            setReadyOrders(Array.isArray(data?.data) ? data.data : []);
+        } catch (_) {
+            setReadyOrders([]);
+        }
+    }, [token]);
+
     const fetchShipments = useCallback(async () => {
         if (!token) return;
         try {
@@ -39,12 +49,33 @@ export default function Shipments() {
         fetchShipments();
     }, [fetchShipments]);
 
+    useEffect(() => {
+        if (batchModalOpen) fetchReadyOrders();
+    }, [batchModalOpen, fetchReadyOrders]);
+
     const handleCreateBatch = async (values) => {
+        if (selectedOrderIds.length === 0) {
+            message.warning('No orders selected');
+            return;
+        }
         try {
+            for (const orderId of selectedOrderIds) {
+                await apiRequest('/api/shipments', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        salesOrderId: orderId,
+                        courierName: values.carrier,
+                        // serviceType: values.serviceType, // Not in model, maybe put in notes? or ignore
+                        // notes: values.notes
+                    })
+                }, token);
+            }
             message.success('Dispatch Manifest Generated');
             setBatchModalOpen(false);
+            fetchShipments();
+            setSelectedOrderIds([]);
         } catch (err) {
-            message.error('Manifest failure');
+            message.error(err.message || 'Manifest failure');
         }
     };
 
@@ -52,7 +83,7 @@ export default function Shipments() {
         { title: 'Shipment ID', dataIndex: 'id', key: 'sn', render: (v, r) => <Link to={`/shipments/${r.id}`} className="font-bold text-teal-600 underline">{String(v).slice(0, 8)}...</Link> },
         { title: 'Courier', dataIndex: 'courierName', key: 'carrier', render: (v) => <Tag color="orange" className="font-bold uppercase text-[10px]">{v || '—'}</Tag> },
         { title: 'Tracking', dataIndex: 'trackingNumber', key: 'track', render: (v) => <span className="font-mono text-xs text-slate-500">{v || 'PENDING'}</span> },
-        { title: 'Status', dataIndex: 'deliveryStatus', key: 'status', render: (s) => <Tag color={s === 'delivered' ? 'green' : 'blue'} className="uppercase font-black border-none">{s || 'pending'}</Tag> },
+        { title: 'Status', dataIndex: 'deliveryStatus', key: 'status', render: (s) => <Tag color={['DELIVERED'].includes((s || '').toUpperCase()) ? 'green' : 'blue'} className="uppercase font-black border-none">{s || 'READY_TO_SHIP'}</Tag> },
         { title: 'Dispatch Date', dataIndex: 'dispatchDate', key: 'date', render: (v) => formatDate(v) },
         {
             title: 'Action',
@@ -83,9 +114,9 @@ export default function Shipments() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">In Transit</div><div className="text-3xl font-black">{shipments.filter(x => x.status === 'in_transit').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-green-500 uppercase mb-1">Delivered (24h)</div><div className="text-3xl font-black">{shipments.filter(x => x.status === 'delivered').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-orange-500 uppercase mb-1">Awaiting Pickup</div><div className="text-3xl font-black">{shipments.filter(x => x.status === 'pending').length}</div></Card>
+                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">In Transit</div><div className="text-3xl font-black">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'IN_TRANSIT').length}</div></Card>
+                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-green-500 uppercase mb-1">Delivered (24h)</div><div className="text-3xl font-black">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'DELIVERED').length}</div></Card>
+                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-orange-500 uppercase mb-1">Awaiting Pickup</div><div className="text-3xl font-black">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'READY_TO_SHIP').length}</div></Card>
                     <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-indigo-500 uppercase mb-1">Global Coverage</div><div className="text-3xl font-black">98.4%</div></Card>
                 </div>
 
@@ -93,7 +124,7 @@ export default function Shipments() {
                     <div className="p-8">
                         <div className="mb-8 flex items-center justify-between">
                             <Search placeholder="Identity Search (Waybill, Tracking, Postcode)..." className="max-w-md h-12 shadow-sm rounded-xl" prefix={<SearchOutlined />} />
-                            <Button icon={<ReloadOutlined />} onClick={() => fetchData('/shipments', setShipments)} />
+                            <Button icon={<ReloadOutlined />} onClick={fetchShipments} />
                         </div>
                         <Table columns={columns} dataSource={shipments} rowKey="id" loading={loading} />
                     </div>

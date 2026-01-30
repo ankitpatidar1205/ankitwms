@@ -62,4 +62,14 @@ async function completePicking(req, res, next) {
   }
 }
 
-module.exports = { list, getById, assignPicker, startPicking, updatePickedQuantity, completePicking };
+async function rejectAssignment(req, res, next) {
+  try {
+    const data = await pickingService.rejectAssignment(req.params.id, req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    if (err.message === 'Not assigned to you') return res.status(403).json({ success: false, message: err.message });
+    next(err);
+  }
+}
+
+module.exports = { list, getById, assignPicker, startPicking, updatePickedQuantity, completePicking, rejectAssignment };
