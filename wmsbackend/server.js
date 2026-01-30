@@ -11,6 +11,7 @@ const orderController = require('./controllers/orderController');
 const inventoryController = require('./controllers/inventoryController');
 const { authenticate, requireSuperAdmin, requireRole } = require('./middlewares/auth');
 const dashboardController = require('./controllers/dashboardController');
+const reportController = require('./controllers/reportController');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,7 +37,11 @@ app.get('/api/dashboard/:type', authenticate, requireRole(...dashboardRoles), (r
   if (type === 'charts') return dashboardController.charts(req, res, next);
   res.status(404).json({ success: false, message: 'Not found. Use /api/dashboard/stats or /api/dashboard/charts' });
 });
-app.get('/api/reports', authenticate, requireRole(...dashboardRoles), dashboardController.reports);
+app.get('/api/reports', authenticate, requireRole(...dashboardRoles), reportController.list);
+app.get('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.getById);
+app.post('/api/reports', authenticate, requireRole(...dashboardRoles), reportController.create);
+app.put('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.update);
+app.delete('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.remove);
 
 // Super admin APIs - register first so they always work
 app.get('/api/superadmin/stats', authenticate, requireSuperAdmin, superadminController.stats);

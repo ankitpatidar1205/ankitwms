@@ -25,6 +25,9 @@ const InventoryAdjustment = require('./InventoryAdjustment');
 const CycleCount = require('./CycleCount');
 const Batch = require('./Batch');
 const Movement = require('./Movement');
+const ReplenishmentTask = require('./ReplenishmentTask');
+const ReplenishmentConfig = require('./ReplenishmentConfig');
+const Report = require('./Report');
 
 // Company
 Company.hasMany(User, { foreignKey: 'companyId' });
@@ -165,6 +168,26 @@ SalesOrder.hasOne(Shipment, { foreignKey: 'salesOrderId' });
 Shipment.belongsTo(SalesOrder, { foreignKey: 'salesOrderId' });
 Shipment.belongsTo(User, { foreignKey: 'packedBy' });
 
+// ReplenishmentTask
+Company.hasMany(ReplenishmentTask, { foreignKey: 'companyId' });
+ReplenishmentTask.belongsTo(Company, { foreignKey: 'companyId' });
+ReplenishmentTask.belongsTo(Product, { foreignKey: 'productId' });
+Product.hasMany(ReplenishmentTask, { foreignKey: 'productId' });
+ReplenishmentTask.belongsTo(Location, { foreignKey: 'fromLocationId', as: 'fromLocation' });
+ReplenishmentTask.belongsTo(Location, { foreignKey: 'toLocationId', as: 'toLocation' });
+Location.hasMany(ReplenishmentTask, { foreignKey: 'fromLocationId', as: 'ReplenishmentTasksFrom' });
+Location.hasMany(ReplenishmentTask, { foreignKey: 'toLocationId', as: 'ReplenishmentTasksTo' });
+
+// ReplenishmentConfig
+Company.hasMany(ReplenishmentConfig, { foreignKey: 'companyId' });
+ReplenishmentConfig.belongsTo(Company, { foreignKey: 'companyId' });
+ReplenishmentConfig.belongsTo(Product, { foreignKey: 'productId' });
+Product.hasMany(ReplenishmentConfig, { foreignKey: 'productId' });
+
+// Report
+Company.hasMany(Report, { foreignKey: 'companyId' });
+Report.belongsTo(Company, { foreignKey: 'companyId' });
+
 module.exports = {
   sequelize,
   User,
@@ -193,4 +216,7 @@ module.exports = {
   CycleCount,
   Batch,
   Movement,
+  ReplenishmentTask,
+  ReplenishmentConfig,
+  Report,
 };

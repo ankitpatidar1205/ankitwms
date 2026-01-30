@@ -72,6 +72,8 @@ export const ROUTE_PERMISSIONS = {
     '/returns': FULL_ACCESS_ROLES,
     '/transfers': FULL_ACCESS_ROLES,
     '/replenishment': FULL_ACCESS_ROLES,
+    '/replenishment/tasks': FULL_ACCESS_ROLES,
+    '/replenishment/settings': FULL_ACCESS_ROLES,
     '/integrations': MANAGEMENT_ROLES,
     '/analytics': VIEWER_ROUTES,
     '/reports': VIEWER_ROUTES,

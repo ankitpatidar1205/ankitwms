@@ -256,6 +256,15 @@ export const MainLayout = ({ children }) => {
         { key: '/shipments', icon: <CarOutlined />, label: 'Shipments' },
         { key: '/returns', icon: <UndoOutlined />, label: 'Returns' },
         {
+            key: 'nav-replenishment',
+            icon: <InboxOutlined />,
+            label: 'Replenishment',
+            children: [
+                { key: '/replenishment/tasks', label: 'Tasks' },
+                { key: '/replenishment/settings', label: 'Settings' },
+            ],
+        },
+        {
             key: 'nav-integrations',
             icon: <ApiOutlined />,
             label: 'Integrations',

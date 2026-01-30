@@ -56,6 +56,8 @@ const GoodsReceiving = lazy(() => import('./pages/inbound/GoodsReceiving'));
 const Packing = lazy(() => import('./pages/outbound/Packing'));
 const Shipments = lazy(() => import('./pages/outbound/Shipments'));
 const Returns = lazy(() => import('./pages/outbound/Returns'));
+const ReplenishmentTasks = lazy(() => import('./pages/replenishment/Tasks'));
+const ReplenishmentSettings = lazy(() => import('./pages/replenishment/Settings'));
 const Settings = lazy(() => import('./pages/Settings'));
 
 
@@ -272,6 +274,8 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
+                <Route path="/replenishment/tasks" element={<ProtectedRoute><ReplenishmentTasks /></ProtectedRoute>} />
+                <Route path="/replenishment/settings" element={<ProtectedRoute><ReplenishmentSettings /></ProtectedRoute>} />
                 <Route
                     path="/settings"
                     element={

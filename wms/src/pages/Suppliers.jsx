@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Card, Form, Drawer, Modal, App, message, Popconfirm } from 'antd';
+import { Table, Button, Input, Select, Space, Card, Form, Drawer, Modal, message, Popconfirm } from 'antd';
 import {
     PlusOutlined,
     SearchOutlined,
@@ -10,22 +10,21 @@ import {
     MailOutlined,
     PhoneOutlined,
     ReloadOutlined,
+    BankOutlined,
+    EnvironmentOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { MainLayout } from '../components/layout/MainLayout';
 import { apiRequest } from '../api/client';
 
 const { Search } = Input;
-const { Option } = Select;
 
 export default function Suppliers() {
-    const navigate = useNavigate();
     const { token, user } = useAuthStore();
     const [loading, setLoading] = useState(true);
     const [suppliers, setSuppliers] = useState([]);
     const [companies, setCompanies] = useState([]);
-    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [searchText, setSearchText] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
@@ -41,7 +40,7 @@ export default function Suppliers() {
             const data = await apiRequest('/api/suppliers', { method: 'GET' }, token);
             setSuppliers(Array.isArray(data?.data) ? data.data : []);
         } catch (err) {
-            message.error(err.message || 'Failed to load suppliers');
+            message.error(err?.message || 'Failed to load suppliers');
             setSuppliers([]);
         } finally {
             setLoading(false);
@@ -53,7 +52,9 @@ export default function Suppliers() {
         try {
             const data = await apiRequest('/api/superadmin/companies', { method: 'GET' }, token);
             setCompanies(Array.isArray(data?.data) ? data.data : []);
-        } catch { setCompanies([]); }
+        } catch {
+            setCompanies([]);
+        }
     }, [token, isSuperAdmin]);
 
     useEffect(() => {
@@ -64,20 +65,36 @@ export default function Suppliers() {
     }, [token, fetchSuppliers, isSuperAdmin, fetchCompanies]);
 
     const filteredSuppliers = suppliers.filter((s) => {
-        const matchesSearch = !searchText ||
-            s.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-            (s.email && s.email.toLowerCase().includes(searchText.toLowerCase())) ||
-            (s.code && s.code.toLowerCase().includes(searchText.toLowerCase()));
-        return matchesSearch;
+        if (!searchText.trim()) return true;
+        const q = searchText.toLowerCase().trim();
+        return (
+            (s.name && s.name.toLowerCase().includes(q)) ||
+            (s.email && s.email.toLowerCase().includes(q)) ||
+            (s.code && s.code.toLowerCase().includes(q)) ||
+            (s.phone && s.phone.toLowerCase().includes(q)) ||
+            (s.address && s.address.toLowerCase().includes(q))
+        );
     });
+
+    const activeCount = suppliers.length; // or filter by status if you add one later
 
     const handleSubmit = async (values) => {
         try {
             setSaving(true);
-            const payload = { code: values.code, name: values.name, email: values.email || null, phone: values.phone || null, address: values.address || null };
+            const payload = {
+                code: values.code,
+                name: values.name,
+                email: values.email || null,
+                phone: values.phone || null,
+                address: values.address || null,
+            };
             if (isSuperAdmin && !editMode) payload.companyId = values.companyId;
             if (editMode && selectedSupplier) {
-                await apiRequest(`/api/suppliers/${selectedSupplier.id}`, { method: 'PUT', body: JSON.stringify(payload) }, token);
+                await apiRequest(
+                    `/api/suppliers/${selectedSupplier.id}`,
+                    { method: 'PUT', body: JSON.stringify(payload) },
+                    token
+                );
                 message.success('Supplier updated!');
             } else {
                 await apiRequest('/api/suppliers', { method: 'POST', body: JSON.stringify(payload) }, token);
@@ -89,7 +106,7 @@ export default function Suppliers() {
             setEditMode(false);
             fetchSuppliers();
         } catch (error) {
-            message.error(error.message || 'Failed to save supplier');
+            message.error(error?.message || 'Failed to save supplier');
         } finally {
             setSaving(false);
         }
@@ -99,58 +116,118 @@ export default function Suppliers() {
         try {
             await apiRequest(`/api/suppliers/${id}`, { method: 'DELETE' }, token);
             message.success('Supplier deleted');
+            setViewDrawerOpen(false);
+            setSelectedSupplier(null);
             fetchSuppliers();
         } catch (err) {
-            message.error(err.message || 'Failed to delete');
+            message.error(err?.message || 'Failed to delete');
         }
     };
 
     const handleEdit = (record) => {
         setSelectedSupplier(record);
-        form.setFieldsValue({ ...record, companyId: record.companyId });
+        form.setFieldsValue({
+            code: record.code,
+            name: record.name,
+            email: record.email,
+            phone: record.phone,
+            address: record.address,
+            companyId: record.companyId,
+        });
         setEditMode(true);
+        setModalOpen(true);
+    };
+
+    const openView = (record) => {
+        setSelectedSupplier(record);
+        setViewDrawerOpen(true);
+    };
+
+    const openAdd = () => {
+        setEditMode(false);
+        setSelectedSupplier(null);
+        form.resetFields();
         setModalOpen(true);
     };
 
     const columns = [
         {
-            title: 'Code',
+            title: 'Supplier Code',
             dataIndex: 'code',
             key: 'code',
-            width: 120,
-            render: (text) => <Tag className="font-mono bg-blue-50 text-blue-700 border-blue-100">{text}</Tag>,
+            width: 130,
+            render: (text) => <span className="font-medium text-gray-800">{text || '—'}</span>,
         },
         {
             title: 'Supplier Name',
             dataIndex: 'name',
             key: 'name',
-            render: (text, record) => (
-                <div className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 hover:text-blue-600">
-                    <ContactsOutlined className="text-blue-500" /> {text}
-                </div>
+            width: 200,
+            render: (text) => (
+                <span className="flex items-center gap-2 text-gray-800">
+                    <BankOutlined className="text-blue-500" />
+                    {text || '—'}
+                </span>
             ),
         },
         {
             title: 'Email',
             dataIndex: 'email',
             key: 'email',
-            render: (email) => <span className="text-gray-500 italic"><MailOutlined className="mr-1" /> {email || '-'}</span>,
+            width: 200,
+            render: (email) => (
+                <span className="flex items-center gap-1.5 text-gray-600">
+                    <MailOutlined className="text-gray-400" />
+                    {email || '—'}
+                </span>
+            ),
         },
         {
             title: 'Phone',
             dataIndex: 'phone',
             key: 'phone',
-            render: (phone) => <span><PhoneOutlined className="mr-1" /> {phone || '-'}</span>,
+            width: 140,
+            render: (phone) => (
+                <span className="flex items-center gap-1.5 text-gray-600">
+                    <PhoneOutlined className="text-gray-400" />
+                    {phone || '—'}
+                </span>
+            ),
         },
         {
             title: 'Actions',
             key: 'actions',
-            width: 150,
+            width: 200,
+            fixed: 'right',
             render: (_, record) => (
-                <Space>
-                    <Button type="text" icon={<EditOutlined className="text-blue-500" />} onClick={() => handleEdit(record)} />
-                    <Popconfirm title="Delete this supplier?" onConfirm={() => handleDelete(record.id)} okText="Yes" cancelText="No">
-                        <Button type="text" danger icon={<DeleteOutlined />} />
+                <Space size="small" wrap>
+                    <Button
+                        type="link"
+                        size="small"
+                        icon={<EyeOutlined />}
+                        className="text-blue-600 p-0"
+                        onClick={() => openView(record)}
+                    >
+                        View
+                    </Button>
+                    <Button
+                        type="link"
+                        size="small"
+                        icon={<EditOutlined />}
+                        className="text-blue-600 p-0"
+                        onClick={() => handleEdit(record)}
+                    >
+                        Edit
+                    </Button>
+                    <Popconfirm
+                        title="Delete this supplier?"
+                        okText="Yes"
+                        cancelText="No"
+                        onConfirm={() => handleDelete(record.id)}
+                    >
+                        <Button type="link" size="small" danger icon={<DeleteOutlined />} className="p-0">
+                            Delete
+                        </Button>
                     </Popconfirm>
                 </Space>
             ),
@@ -159,71 +236,221 @@ export default function Suppliers() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Suppliers</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Manage active vendor partnerships and logistics contacts</p>
+                        <h1 className="text-2xl font-semibold">
+                            <span className="text-blue-600">Supplier</span>{' '}
+                            <span className="text-purple-600">Management</span>
+                        </h1>
+                        <p className="text-gray-500 text-sm mt-0.5">
+                            Manage your supplier database and relationships
+                        </p>
                     </div>
-                    <Button type="primary" icon={<PlusOutlined />} size="large" className="h-12 rounded-xl shadow-lg shadow-blue-200" onClick={() => { setEditMode(false); form.resetFields(); setModalOpen(true); }}>
-                        Register Supplier
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        className="bg-blue-600 border-blue-600 rounded-lg"
+                        onClick={openAdd}
+                    >
+                        Add Supplier
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card className="rounded-2xl border-none shadow-sm bg-blue-50/50">
-                        <div className="text-blue-600 font-bold text-xs uppercase tracking-widest mb-1">Total Vendors</div>
-                        <div className="text-3xl font-black text-slate-800">{suppliers.length}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm font-normal">Total Suppliers</div>
+                        <div className="text-xl font-medium text-blue-600">{suppliers.length}</div>
                     </Card>
-                    <Card className="rounded-2xl border-none shadow-sm bg-green-50/50">
-                        <div className="text-green-600 font-bold text-xs uppercase tracking-widest mb-1">Active Deals</div>
-                        <div className="text-3xl font-black text-slate-800">{suppliers.length}</div>
-                    </Card>
-                    <Card className="rounded-2xl border-none shadow-sm bg-purple-50/50">
-                        <div className="text-purple-600 font-bold text-xs uppercase tracking-widest mb-1">Integrations</div>
-                        <div className="text-3xl font-black text-slate-800">4</div>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm font-normal">Active Suppliers</div>
+                        <div className="text-xl font-medium text-green-600">{activeCount}</div>
                     </Card>
                 </div>
 
-                <Card className="rounded-2xl shadow-sm border-gray-100 overflow-hidden">
-                    <div className="mb-6 flex gap-4">
-                        <Search placeholder="Search suppliers..." className="max-w-md h-10" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} />
-                        <Button icon={<ReloadOutlined />} onClick={fetchSuppliers} className="h-10 rounded-lg">Live Sync</Button>
+                <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
+                    <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
+                        <Search
+                            placeholder="Search by name, email, or code..."
+                            value={searchText}
+                            onChange={(e) => setSearchText(e.target.value)}
+                            className="max-w-sm rounded-lg"
+                            prefix={<SearchOutlined className="text-blue-500" />}
+                            allowClear
+                        />
+                        <Button
+                            icon={<ReloadOutlined />}
+                            onClick={fetchSuppliers}
+                            loading={loading}
+                            className="rounded-lg"
+                        >
+                            Refresh
+                        </Button>
                     </div>
-                    <Table columns={columns} dataSource={filteredSuppliers} rowKey="id" loading={loading} />
+                    <Table
+                        columns={columns}
+                        dataSource={filteredSuppliers}
+                        rowKey="id"
+                        loading={loading}
+                        pagination={{
+                            showSizeChanger: true,
+                            showTotal: (t) => `Total ${t} suppliers`,
+                            pageSize: 10,
+                        }}
+                        scroll={{ x: 900 }}
+                        className="[&_.ant-table-thead_th]:font-normal"
+                    />
                 </Card>
 
+                {/* Add / Edit Modal */}
                 <Modal
-                    title={editMode ? 'Update Partner' : 'New Vendor Registration'}
+                    title={editMode ? 'Edit Supplier' : 'Add Supplier'}
                     open={modalOpen}
-                    onCancel={() => { setModalOpen(false); setSelectedSupplier(null); setEditMode(false); }}
-                    onOk={() => form.submit()}
-                    confirmLoading={saving}
-                    className="rounded-2xl"
+                    onCancel={() => {
+                        setModalOpen(false);
+                        setSelectedSupplier(null);
+                        setEditMode(false);
+                    }}
+                    footer={null}
+                    width={520}
+                    className="rounded-xl"
                 >
-                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-4">
+                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-2">
                         {isSuperAdmin && !editMode && (
-                            <Form.Item label="Company" name="companyId" rules={[{ required: true, message: 'Select company' }]}>
-                                <Select placeholder="Select company" className="h-10 rounded-lg" showSearch optionFilterProp="label" options={companies.map(c => ({ value: c.id, label: c.name }))} />
+                            <Form.Item
+                                label="Company"
+                                name="companyId"
+                                rules={[{ required: true, message: 'Select company' }]}
+                            >
+                                <Select
+                                    placeholder="Select company"
+                                    className="rounded-lg"
+                                    showSearch
+                                    optionFilterProp="label"
+                                    options={companies.map((c) => ({ value: c.id, label: c.name }))}
+                                />
                             </Form.Item>
                         )}
-                        <Form.Item label="Supplier Code" name="code" rules={[{ required: true }]}>
-                            <Input placeholder="e.g. SUP-GLOBAL" disabled={editMode} className="h-10 rounded-lg" />
+                        <Form.Item
+                            label="Supplier Code"
+                            name="code"
+                            rules={[{ required: true, message: 'Required' }]}
+                        >
+                            <Input placeholder="e.g. SUP001" disabled={editMode} className="rounded-lg" />
                         </Form.Item>
-                        <Form.Item label="Partner Name" name="name" rules={[{ required: true }]}>
-                            <Input placeholder="Company name" className="h-10 rounded-lg" />
+                        <Form.Item
+                            label="Supplier Name"
+                            name="name"
+                            rules={[{ required: true, message: 'Required' }]}
+                        >
+                            <Input placeholder="Supplier or company name" className="rounded-lg" />
                         </Form.Item>
-                        <Form.Item label="Contact Email" name="email">
-                            <Input type="email" className="h-10 rounded-lg" />
+                        <Form.Item label="Email" name="email">
+                            <Input type="email" placeholder="email@example.com" className="rounded-lg" />
                         </Form.Item>
-                        <Form.Item label="Support Phone" name="phone">
-                            <Input className="h-10 rounded-lg" />
+                        <Form.Item label="Phone" name="phone">
+                            <Input placeholder="Phone number" className="rounded-lg" />
                         </Form.Item>
                         <Form.Item label="Address" name="address">
-                            <Input.TextArea rows={2} className="rounded-lg" />
+                            <Input.TextArea rows={3} placeholder="Full address" className="rounded-lg" />
                         </Form.Item>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button
+                                onClick={() => {
+                                    setModalOpen(false);
+                                    setSelectedSupplier(null);
+                                    setEditMode(false);
+                                }}
+                                className="rounded-lg"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={saving}
+                                className="bg-blue-600 border-blue-600 rounded-lg"
+                            >
+                                {editMode ? 'Update' : 'Create'}
+                            </Button>
+                        </div>
                     </Form>
                 </Modal>
+
+                {/* View Drawer */}
+                <Drawer
+                    title={`Supplier: ${selectedSupplier?.name || '—'}`}
+                    width={480}
+                    open={viewDrawerOpen}
+                    onClose={() => {
+                        setViewDrawerOpen(false);
+                        setSelectedSupplier(null);
+                    }}
+                    className="rounded-l-3xl"
+                    destroyOnClose
+                >
+                    {selectedSupplier && (
+                        <div className="space-y-5">
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <div className="text-gray-500 text-xs font-medium uppercase mb-1">
+                                        Supplier Code
+                                    </div>
+                                    <div className="font-medium text-gray-800">{selectedSupplier.code || '—'}</div>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <div className="text-gray-500 text-xs font-medium uppercase mb-1 flex items-center gap-1">
+                                        <BankOutlined /> Supplier Name
+                                    </div>
+                                    <div className="font-medium text-gray-800">{selectedSupplier.name || '—'}</div>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <div className="text-gray-500 text-xs font-medium uppercase mb-1 flex items-center gap-1">
+                                        <MailOutlined /> Email
+                                    </div>
+                                    <div className="text-gray-800">{selectedSupplier.email || '—'}</div>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <div className="text-gray-500 text-xs font-medium uppercase mb-1 flex items-center gap-1">
+                                        <PhoneOutlined /> Phone
+                                    </div>
+                                    <div className="text-gray-800">{selectedSupplier.phone || '—'}</div>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <div className="text-gray-500 text-xs font-medium uppercase mb-1 flex items-center gap-1">
+                                        <EnvironmentOutlined /> Address
+                                    </div>
+                                    <div className="text-gray-800 whitespace-pre-wrap">
+                                        {selectedSupplier.address || '—'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 pt-2 border-t border-gray-200">
+                                <Button
+                                    type="primary"
+                                    icon={<EditOutlined />}
+                                    className="bg-blue-600 border-blue-600 rounded-lg"
+                                    onClick={() => {
+                                        setViewDrawerOpen(false);
+                                        handleEdit(selectedSupplier);
+                                    }}
+                                >
+                                    Edit
+                                </Button>
+                                <Popconfirm
+                                    title="Delete this supplier?"
+                                    okText="Yes"
+                                    cancelText="No"
+                                    onConfirm={() => handleDelete(selectedSupplier.id)}
+                                >
+                                    <Button danger icon={<DeleteOutlined />} className="rounded-lg">
+                                        Delete
+                                    </Button>
+                                </Popconfirm>
+                            </div>
+                        </div>
+                    )}
+                </Drawer>
             </div>
         </MainLayout>
     );
