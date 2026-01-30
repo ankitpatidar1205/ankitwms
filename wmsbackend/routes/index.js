@@ -19,6 +19,7 @@ const shipmentRoutes = require('../modules/shipment/routes');
 const purchaseOrderRoutes = require('./purchaseOrders');
 const goodsReceivingRoutes = require('./goodsReceiving');
 const replenishmentRoutes = require('./replenishment');
+const returnRoutes = require('./returnRoutes');
 const labelsController = require('../controllers/labelsController');
 
 router.use('/auth', authRoutes);
@@ -42,5 +43,6 @@ router.use('/api/shipments', shipmentRoutes);
 router.use('/api/purchase-orders', purchaseOrderRoutes);
 router.use('/api/goods-receiving', goodsReceivingRoutes);
 router.use('/api/replenishment', replenishmentRoutes);
+router.use('/api/returns', returnRoutes);
 
 module.exports = router;

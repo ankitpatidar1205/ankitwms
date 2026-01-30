@@ -105,7 +105,7 @@ export default function Shipments() {
         message.success('Label sent to printer');
     };
     const columns = [
-        { title: 'Shipment ID', dataIndex: 'id', key: 'sn', render: (v, r) => <Link to={`/shipments/${r.id}`} className="font-bold text-teal-600 underline">{String(v).slice(0, 8)}...</Link> },
+        { title: 'Shipment ID', dataIndex: 'id', key: 'sn', render: (v, r) => <a onClick={() => handleViewClick(r)} className="font-bold text-teal-600 underline">SHI-{String(v).padStart(3, '0')}</a> },
         { title: 'Courier', dataIndex: 'courierName', key: 'carrier', render: (v) => <Tag color="orange" className="font-bold uppercase text-[10px]">{v || '—'}</Tag> },
         { title: 'Tracking', dataIndex: 'trackingNumber', key: 'track', render: (v) => <span className="font-mono text-xs text-slate-500">{v || 'PENDING'}</span> },
         { title: 'Status', dataIndex: 'deliveryStatus', key: 'status', render: (s) => <Tag color={['DELIVERED'].includes((s || '').toUpperCase()) ? 'green' : 'blue'} className="uppercase font-black border-none">{s || 'READY_TO_SHIP'}</Tag> },
@@ -212,7 +212,7 @@ export default function Shipments() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-xs text-gray-400 uppercase font-bold">Shipment ID</p>
-                                        <p className="font-mono font-bold text-xl text-teal-600">{String(selectedShipment.id).slice(0, 8)}</p>
+                                        <p className="font-mono font-bold text-xl text-teal-600">SHI-{String(selectedShipment.id).padStart(3, '0')}</p>
                                     </div>
                                     <div className="text-right">
                                         <Tag color="blue" className="text-lg py-1 px-3 rounded-lg font-bold uppercase">{selectedShipment.deliveryStatus}</Tag>

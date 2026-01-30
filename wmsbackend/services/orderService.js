@@ -16,6 +16,7 @@ async function list(reqUser, query = {}) {
       { association: 'Company', attributes: ['id', 'name', 'code'] },
       { association: 'Customer', attributes: ['id', 'name', 'email'] },
       { association: 'OrderItems', include: [{ association: 'Product', attributes: ['id', 'name', 'sku'] }] },
+      { association: 'Shipment' },
     ],
   });
   return orders;
