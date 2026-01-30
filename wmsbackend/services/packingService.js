@@ -100,6 +100,17 @@ async function completePacking(id, reqUser) {
   const task = await PackingTask.findByPk(id, { include: ['SalesOrder'] });
   if (!task) throw new Error('Packing task not found');
   if (reqUser.role === 'packer' && task.assignedTo !== reqUser.id) throw new Error('Not assigned to you');
+  if (task.status === 'PACKED') return task; // Idempotency
+
+  // Create Shipment
+  const { Shipment } = require('../models');
+  await Shipment.create({
+    salesOrderId: task.salesOrderId,
+    companyId: task.SalesOrder.companyId, // Ensure SalesOrder is fetched
+    packedBy: reqUser.id,
+    dispatchDate: new Date(),
+    deliveryStatus: 'READY_TO_SHIP'
+  });
 
   await task.update({ status: 'PACKED', packedAt: new Date() });
   await task.SalesOrder.update({ status: 'PACKED' });

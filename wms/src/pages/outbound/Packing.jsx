@@ -117,11 +117,30 @@ export default function Packing() {
         }
     };
 
+    const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
+
+    const handleDispatch = async () => {
+        if (!selectedTask) return;
+        try {
+            await apiRequest(`/api/packing/${selectedTask.id}/complete`, { method: 'POST' }, token);
+            message.success('Dispatch Successful - Shipment Created');
+            setDispatchModalOpen(false);
+            fetchPacking();
+        } catch (err) {
+            message.error(err.message || 'Dispatch failed');
+        }
+    };
+
     const handleEditClick = (task) => {
         setSelectedTask(task);
         const { user } = useAuthStore.getState();
         if (user?.role === 'packer') {
-            setAcceptRejectModalOpen(true);
+            const status = (task.status || '').toUpperCase();
+            if (['PACKING', 'IN_PROGRESS'].includes(status)) {
+                setDispatchModalOpen(true);
+            } else {
+                setAcceptRejectModalOpen(true);
+            }
         } else {
             if (task.assignedTo) {
                 assignForm.setFieldsValue({ userId: task.assignedTo });
@@ -223,42 +242,43 @@ export default function Packing() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-                <div className="flex justify-between items-end">
+            <div className="space-y-6 animate-in fade-in duration-500">
+                <div className="flex justify-between items-center">
                     <div>
                         <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Packing</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-[0.2em]">Final stage verification and containerization</p>
+                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Final stage verification and containerization</p>
                     </div>
-                    <Button icon={<ReloadOutlined />} onClick={fetchPacking} className="h-12 rounded-xl border-slate-200">Refresh</Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1">Dispatched</div><div className="text-3xl font-black text-orange-500">{packingTasks.filter(x => x.status === 'PACKED').length}</div></Card>
+                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">In Progress</div><div className="text-3xl font-black text-blue-500">{packingTasks.filter(x => x.status === 'PACKING').length}</div></Card>
+                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Completed</div><div className="text-3xl font-black text-green-500">{packingTasks.filter(x => x.status === 'PACKED').length}</div></Card>
                 </div>
 
-                {renderCards()}
-
-                <Card className="rounded-[2rem] shadow-sm border-gray-100 overflow-hidden">
-                    <div className="p-8">
-                        <div className="flex items-center justify-between mb-8 gap-6">
-                            <Search placeholder="Identity Search (Slip, Order, Customer)..." className="max-w-md h-12 shadow-inner rounded-xl" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} />
+                <Card className="rounded-3xl shadow-sm border-gray-100 overflow-hidden">
+                    <div className="mb-6 p-2 bg-slate-50 rounded-2xl flex items-center gap-4">
+                        <Search placeholder="Identity Search (Slip, Order, Customer)..." className="max-w-md h-12 shadow-sm rounded-xl" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} />
+                        <div className="flex-1 flex justify-end gap-2">
                             <Tabs
                                 activeKey={activeTab}
                                 onChange={setActiveTab}
                                 items={[
                                     { key: 'NOT_STARTED', label: 'Pending' },
-                                    ...(useAuthStore.getState().user?.role !== 'packer' ? [{ key: 'ASSIGNED', label: 'Assigned' }] : []),
                                     { key: 'PACKING', label: 'In Progress' }
                                 ]}
                                 className="packing-tabs"
                             />
                         </div>
-                        <Table columns={columns} dataSource={filteredTasks} rowKey="id" loading={loading} />
                     </div>
+                    <Table columns={columns} dataSource={filteredTasks} rowKey="id" loading={loading} />
                 </Card>
 
                 <Modal title="Accept or Reject Assignment" open={acceptRejectModalOpen} onCancel={() => setAcceptRejectModalOpen(false)} footer={null}>
                     {selectedTask && (
                         <div className="text-center space-y-6">
                             <div className="bg-gray-50 p-4 rounded-xl">
-                                <h3 className="text-lg font-bold text-gray-800 mb-2">{selectedTask.SalesOrder?.orderNumber}</h3>
-                                <p className="text-gray-500">Task ID: {String(selectedTask.id).slice(0, 8)}</p>
+                                <h3 className="text-lg font-bold text-gray-800 mb-2">{shortenOrderNumber(selectedTask.SalesOrder?.orderNumber)}</h3>
+                                <p className="text-gray-500">Task ID: {selectedTask.id}</p>
                                 <p className="text-gray-500">Customer: {selectedTask.SalesOrder?.Customer?.name || '—'}</p>
                             </div>
                             <div className="flex justify-center gap-4">
@@ -269,10 +289,26 @@ export default function Packing() {
                     )}
                 </Modal>
 
+                <Modal title="Confirm Dispatch" open={dispatchModalOpen} onCancel={() => setDispatchModalOpen(false)} footer={null}>
+                    {selectedTask && (
+                        <div className="text-center space-y-6">
+                            <div className="bg-gray-50 p-4 rounded-xl">
+                                <h3 className="text-lg font-bold text-gray-800 mb-2">{shortenOrderNumber(selectedTask.SalesOrder?.orderNumber)}</h3>
+                                <p className="text-gray-500">Customer: {selectedTask.SalesOrder?.Customer?.name || '—'}</p>
+                                <p className="text-sm text-blue-500 font-bold mt-2">Ready to create shipment?</p>
+                            </div>
+                            <div className="flex justify-center gap-4">
+                                <Button size="large" onClick={() => setDispatchModalOpen(false)} className="w-32 h-12 rounded-xl border-slate-200">Cancel</Button>
+                                <Button size="large" type="primary" className="w-32 h-12 rounded-xl font-bold bg-purple-600 hover:bg-purple-700 border-none" onClick={handleDispatch} icon={<RocketOutlined />}>Dispatch</Button>
+                            </div>
+                        </div>
+                    )}
+                </Modal>
+
                 <Modal title="Assign Picker" open={assignModalOpen} onCancel={() => setAssignModalOpen(false)} onOk={() => assignForm.submit()} className="assign-modal">
                     {selectedTask && (
                         <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                            <p><strong>Order #:</strong> {selectedTask.SalesOrder?.orderNumber}</p>
+                            <p><strong>Order #:</strong> {shortenOrderNumber(selectedTask.SalesOrder?.orderNumber)}</p>
                             <p><strong>Customer:</strong> {selectedTask.SalesOrder?.Customer?.name || '—'}</p>
                             <p><strong>Items:</strong> {selectedTask.PickList?.PickListItems?.length || 0}</p>
                         </div>
@@ -288,7 +324,7 @@ export default function Packing() {
                     </Form>
                 </Modal>
 
-                <Modal title="Packing Task Details" open={viewModalOpen} onCancel={() => setViewModalOpen(false)} footer={<Button onClick={() => setViewModalOpen(false)}>Close</Button>}>
+                <Modal title="Task Details" open={viewModalOpen} onCancel={() => setViewModalOpen(false)} footer={<Button onClick={() => setViewModalOpen(false)}>Close</Button>}>
                     {selectedTask && (
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
@@ -300,11 +336,11 @@ export default function Packing() {
                                     <p className="text-xs text-gray-400 uppercase font-bold">Status</p>
                                     <Tag color={selectedTask.status === 'PACKED' ? 'green' : 'blue'}>{selectedTask.status}</Tag>
                                 </div>
-                                <div>
+                                <div className="col-span-2">
                                     <p className="text-xs text-gray-400 uppercase font-bold">Sales Order</p>
-                                    <p className="font-bold">{selectedTask.SalesOrder?.orderNumber}</p>
+                                    <p className="font-bold">{shortenOrderNumber(selectedTask.SalesOrder?.orderNumber)}</p>
                                 </div>
-                                <div>
+                                <div className="col-span-2">
                                     <p className="text-xs text-gray-400 uppercase font-bold">Customer</p>
                                     <p>{selectedTask.SalesOrder?.Customer?.name || '—'}</p>
                                 </div>
@@ -320,8 +356,8 @@ export default function Packing() {
                         </div>
                     )}
                 </Modal>
-            </div >
-        </MainLayout >
+            </div>
+        </MainLayout>
     );
 }
 

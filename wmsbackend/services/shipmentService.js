@@ -10,7 +10,7 @@ async function list(reqUser, query = {}) {
     where,
     order: [['createdAt', 'DESC']],
     include: [
-      { association: 'SalesOrder', attributes: ['id', 'orderNumber', 'status'] },
+      { association: 'SalesOrder', attributes: ['id', 'orderNumber', 'status'], include: ['Customer'] },
       { association: 'Company', attributes: ['id', 'name', 'code'] },
       { association: 'User', attributes: ['id', 'name', 'email'], required: false },
     ],

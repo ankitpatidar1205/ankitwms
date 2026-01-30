@@ -79,6 +79,31 @@ export default function Shipments() {
         }
     };
 
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [selectedShipment, setSelectedShipment] = useState(null);
+
+    const handleViewClick = (record) => {
+        setSelectedShipment(record);
+        setViewModalOpen(true);
+    };
+
+    const [printModalOpen, setPrintModalOpen] = useState(false);
+
+    const handlePrint = (record) => {
+        setSelectedShipment(record);
+        setPrintModalOpen(true);
+    };
+
+    const shortenOrderNumber = (num) => {
+        if (!num) return '—';
+        const parts = num.split('-');
+        return parts.length === 3 ? `ORD-${parts[2]}` : num;
+    };
+
+    const confirmPrint = () => {
+        setPrintModalOpen(false);
+        message.success('Label sent to printer');
+    };
     const columns = [
         { title: 'Shipment ID', dataIndex: 'id', key: 'sn', render: (v, r) => <Link to={`/shipments/${r.id}`} className="font-bold text-teal-600 underline">{String(v).slice(0, 8)}...</Link> },
         { title: 'Courier', dataIndex: 'courierName', key: 'carrier', render: (v) => <Tag color="orange" className="font-bold uppercase text-[10px]">{v || '—'}</Tag> },
@@ -90,8 +115,8 @@ export default function Shipments() {
             key: 'act',
             render: (_, r) => (
                 <Space>
-                    <Button type="text" icon={<EyeOutlined />} />
-                    <Button type="text" icon={<PrinterOutlined className="text-teal-500" />} />
+                    <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewClick(r)} />
+                    <Button type="text" icon={<PrinterOutlined className="text-teal-500" />} onClick={() => handlePrint(r)} />
                 </Space>
             )
         }
@@ -142,14 +167,85 @@ export default function Shipments() {
                             <span className="text-[10px] font-bold text-gray-400 capitalize underline cursor-pointer" onClick={() => setSelectedOrderIds(readyOrders.map(o => o.id))}>Select All Items</span>
                         </div>
                         <Table className="ready-table" pagination={false} scroll={{ y: 300 }} rowSelection={{ selectedRowKeys: selectedOrderIds, onChange: setSelectedOrderIds }} dataSource={readyOrders} rowKey="id" columns={[
-                            { title: 'Order', dataIndex: 'orderNumber', render: (v) => <b className="text-indigo-600">{v}</b> },
-                            { title: 'Customer', dataIndex: ['customer', 'name'] },
+                            { title: 'Order', dataIndex: 'orderNumber', render: (v) => <b className="text-indigo-600">{shortenOrderNumber(v)}</b> },
+                            { title: 'Customer', dataIndex: ['Customer', 'name'] },
                             { title: 'Destination Postcode', dataIndex: 'postcode' },
                             { title: 'Package Weight', dataIndex: 'weight', render: (v) => `${v || 0} kg` }
                         ]} />
                     </Form>
                 </Modal>
-            </div>
-        </MainLayout>
+
+                <Modal title="Print Label Preview" open={printModalOpen} onCancel={() => setPrintModalOpen(false)} footer={null} width={400}>
+                    {selectedShipment && (
+                        <div className="flex flex-col items-center space-y-4">
+                            <div className="border-2 border-dashed border-gray-300 p-6 w-full rounded-lg bg-white relative">
+                                <div className="absolute top-2 right-2 font-bold text-xs text-gray-400">STANDARD</div>
+                                <div className="text-center mb-6">
+                                    <h3 className="text-2xl font-black uppercase tracking-widest text-slate-900">{selectedShipment.courierName || 'POST'}</h3>
+                                    <div className="h-12 bg-slate-900 w-full my-2 rounded-sm" />
+                                    <p className="font-mono text-xs">{selectedShipment.trackingNumber || 'TRK-PENDING-001'}</p>
+                                </div>
+                                <div className="space-y-4 text-sm">
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">TO:</p>
+                                        <p className="font-bold">{selectedShipment.SalesOrder?.Customer?.name || 'Customer'}</p>
+                                        <p className="text-gray-500">123 Shipping Lane, Warehouse City, UK</p>
+                                    </div>
+                                    <Divider className="my-2" />
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">REF:</p>
+                                        <p className="font-mono">{shortenOrderNumber(selectedShipment.SalesOrder?.orderNumber)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <Button type="primary" size="large" icon={<PrinterOutlined />} className="w-full h-12 rounded-xl font-bold" onClick={confirmPrint}>
+                                Print Label
+                            </Button>
+                        </div>
+                    )}
+                </Modal>
+
+                <Modal title="Shipment Details" open={viewModalOpen} onCancel={() => setViewModalOpen(false)} footer={<Button onClick={() => setViewModalOpen(false)}>Close</Button>} width={600}>
+                    {selectedShipment && (
+                        <div className="space-y-6">
+                            <div className="bg-gray-50 p-6 rounded-2xl">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-gray-400 uppercase font-bold">Shipment ID</p>
+                                        <p className="font-mono font-bold text-xl text-teal-600">{String(selectedShipment.id).slice(0, 8)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <Tag color="blue" className="text-lg py-1 px-3 rounded-lg font-bold uppercase">{selectedShipment.deliveryStatus}</Tag>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Divider className="my-2" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400 uppercase font-bold">Sales Order</p>
+                                        <p className="font-bold text-gray-800">{shortenOrderNumber(selectedShipment.SalesOrder?.orderNumber) || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400 uppercase font-bold">Customer</p>
+                                        <p className="font-bold text-gray-800">{selectedShipment.SalesOrder?.Customer?.name || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400 uppercase font-bold">Courier</p>
+                                        <p className="font-medium">{selectedShipment.courierName || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400 uppercase font-bold">Tracking #</p>
+                                        <p className="font-mono bg-white p-1 rounded border border-gray-200 inline-block">{selectedShipment.trackingNumber || 'PENDING'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400 uppercase font-bold">Dispatch Date</p>
+                                        <p>{formatDate(selectedShipment.dispatchDate)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </Modal>
+            </div >
+        </MainLayout >
     );
 }

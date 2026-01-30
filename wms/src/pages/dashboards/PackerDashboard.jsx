@@ -17,10 +17,9 @@ export default function PackerDashboard() {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState({
         stats: {
-            ordersPackedToday: { value: 0, change: 0, trend: 'up' },
-            shipmentsReady: { value: 0, change: 0, trend: 'up' },
-            accuracy: { value: 99, change: 0, trend: 'up' },
-            avgPackTime: { value: 0, change: 0, trend: 'down' },
+            pending: { value: 0, change: 0, trend: 'neutral' },
+            complete: { value: 0, change: 0, trend: 'up' },
+            return: { value: 0, change: 0, trend: 'flat' },
         },
         packingQueue: [],
         dailyGoal: 80,
@@ -37,24 +36,31 @@ export default function PackerDashboard() {
             const list = Array.isArray(packingRes.data) ? packingRes.data : [];
             const queue = list.map((t) => ({
                 id: String(t.id),
-                orderNumber: t.SalesOrder?.orderNumber || `ORD-${t.salesOrderId}`,
+                orderNumber: t.SalesOrder?.orderNumber ? (t.SalesOrder.orderNumber.split('-').length === 3 ? `ORD-${t.SalesOrder.orderNumber.split('-')[2]}` : t.SalesOrder.orderNumber) : '—',
                 customer: t.SalesOrder?.Customer?.name || '-',
                 priority: t.status === 'packing' ? 'high' : 'medium',
                 items: (t.PickList?.PickListItems && t.PickList.PickListItems.length) || 0,
-                status: (t.status || 'pending').toUpperCase() === 'PACKING' ? 'PACKING' : 'PENDING',
+                status: (t.status || 'pending').toUpperCase(), // Keep original status mostly, map strictly for display
             }));
-            const pendingCount = list.filter((t) => t.status === 'pending' || t.status === 'packing').length;
+
+            const pendingCount = list.filter((t) => ['PENDING', 'PACKING', 'NOT_STARTED', 'ASSIGNED'].includes((t.status || '').toUpperCase())).length;
+            const completedCount = list.filter((t) => (t.status || '').toUpperCase() === 'PACKED').length;
+
             const d = statsRes.data || {};
+            const packedToday = d.ordersPackedToday ?? completedCount;
+
+            const totalOrders = pendingCount + packedToday;
+            const progressPercent = totalOrders > 0 ? Math.round((packedToday / totalOrders) * 100) : 0;
+
             setData({
                 stats: {
-                    ordersPackedToday: { value: pendingCount, change: 0, trend: 'up' },
-                    shipmentsReady: { value: d.packingPendingCount ?? 0, change: 0, trend: 'up' },
-                    accuracy: { value: 99, change: 0, trend: 'up' },
-                    avgPackTime: { value: 0, change: 0, trend: 'down' },
+                    pending: { value: pendingCount, change: 0, trend: 'neutral' },
+                    complete: { value: packedToday, change: 0, trend: 'up' },
+                    return: { value: 0, change: 0, trend: 'flat' },
                 },
-                packingQueue: queue,
-                dailyGoal: 80,
-                goalProgress: Math.min(100, (pendingCount / 80) * 100),
+                packingQueue: queue, // Show ALL orders including PACKED
+                dailyGoal: totalOrders,
+                goalProgress: progressPercent,
             });
         } catch (_) {
             setData((prev) => ({ ...prev, packingQueue: [] }));
@@ -91,23 +97,19 @@ export default function PackerDashboard() {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
-            render: (status) => (
-                <Tag color={status === 'PACKING' ? 'processing' : 'default'} className="rounded-full px-3">
-                    {status === 'PACKING' ? 'Packing' : 'Pending'}
-                </Tag>
-            ),
-        },
-        {
-            title: 'Action',
-            key: 'action',
-            render: (_, record) => (
-                <Link to={`/packing/${record.id}`}>
-                    <Button type="primary" size="small" className="rounded-lg">
-                        {record.status === 'PACKING' ? 'Continue' : 'Start'}
-                    </Button>
-                </Link>
-            ),
-        },
+            render: (status) => {
+                let color = 'default';
+                let label = 'Pending';
+                if (status === 'PACKING') { color = 'processing'; label = 'Packing'; }
+                if (status === 'PACKED') { color = 'success'; label = 'Completed'; }
+
+                return (
+                    <Tag color={color} className="rounded-full px-3 font-bold">
+                        {label}
+                    </Tag>
+                );
+            },
+        }
     ];
 
     if (loading) return <MainLayout><div className="flex justify-center items-center min-h-[200px]"><Spin size="large" /></div></MainLayout>;
@@ -130,104 +132,90 @@ export default function PackerDashboard() {
                     </Button>
                 </div>
 
-                {/* KPI Cards */}
+                {/* KPI Cards: Pending, Complete, Return */}
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} lg={6}>
+                    <Col xs={24} sm={8}>
                         <KPICard
-                            title="Orders Packed"
-                            value={data.stats.ordersPackedToday.value}
-                            change={data.stats.ordersPackedToday.change}
-                            trend={data.stats.ordersPackedToday.trend}
-                            icon={<InboxOutlined />}
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Shipments Ready"
-                            value={data.stats.shipmentsReady.value}
-                            change={data.stats.shipmentsReady.change}
-                            trend={data.stats.shipmentsReady.trend}
-                            icon={<CarOutlined />}
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Packing Accuracy"
-                            value={data.stats.accuracy.value}
-                            change={data.stats.accuracy.change}
-                            trend={data.stats.accuracy.trend}
-                            icon={<CheckCircleOutlined />}
-                            suffix="%"
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Avg Pack Time"
-                            value={data.stats.avgPackTime.value}
-                            change={data.stats.avgPackTime.change}
-                            trend={data.stats.avgPackTime.trend}
+                            title="Pending Orders"
+                            value={data.stats.pending.value}
+                            change={data.stats.pending.change}
+                            trend={data.stats.pending.trend}
                             icon={<ClockCircleOutlined />}
-                            suffix="min"
+                            color="orange"
+                        />
+                    </Col>
+                    <Col xs={24} sm={8}>
+                        <KPICard
+                            title="Completed Today"
+                            value={data.stats.complete.value}
+                            change={data.stats.complete.change}
+                            trend={data.stats.complete.trend}
+                            icon={<CheckCircleOutlined />}
+                            color="green"
+                        />
+                    </Col>
+                    <Col xs={24} sm={8}>
+                        <KPICard
+                            title="Returns"
+                            value={data.stats.return.value}
+                            change={data.stats.return.change}
+                            trend={data.stats.return.trend}
+                            icon={<ReloadOutlined />}
+                            color="red"
                         />
                     </Col>
                 </Row>
 
-                {/* Packing Queue */}
-                <Card
-                    title={<span className="font-bold text-gray-700">Packing Assignments</span>}
-                    className="shadow-sm rounded-xl border-gray-100"
-                    extra={<Tag color="purple" className="rounded-full px-3 font-bold">{data.packingQueue.length} Orders</Tag>}
-                >
-                    {data.packingQueue.length > 0 ? (
-                        <Table
-                            dataSource={data.packingQueue}
-                            columns={columns}
-                            rowKey="id"
-                            pagination={false}
-                            size="middle"
-                        />
-                    ) : (
-                        <Empty
-                            description="No orders waiting to be packed."
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        />
-                    )}
-                </Card>
-
-                {/* Action Panel */}
+                {/* AI & Progress Section */}
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} lg={12}>
-                        <Card title={<span className="font-bold text-gray-700">Daily Progress</span>} className="shadow-sm rounded-xl border-gray-100 h-full">
-                            <div>
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-gray-500 font-medium text-sm">Target: {data.dailyGoal} Orders</span>
-                                    <span className="font-bold text-purple-600">{data.stats.ordersPackedToday.value} Packed</span>
-                                </div>
-                                <Progress
-                                    percent={data.goalProgress}
-                                    status={data.goalProgress >= 100 ? 'success' : 'active'}
-                                    strokeColor={{ '0%': '#722ed1', '100%': '#52c41a' }}
-                                    strokeWidth={12}
+                    <Col xs={24} lg={16}>
+                        {/* Packing Queue Table */}
+                        <Card
+                            title={<span className="font-bold text-gray-700">Packing Assignments</span>}
+                            className="shadow-sm rounded-xl border-gray-100 h-full"
+                            extra={<Tag color="purple" className="rounded-full px-3 font-bold">{data.packingQueue.length} Active</Tag>}
+                        >
+                            {data.packingQueue.length > 0 ? (
+                                <Table
+                                    dataSource={data.packingQueue}
+                                    columns={columns}
+                                    rowKey="id"
+                                    pagination={{ pageSize: 8 }}
+                                    size="middle"
                                 />
-                            </div>
+                            ) : (
+                                <Empty
+                                    description="No pending orders."
+                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                />
+                            )}
                         </Card>
                     </Col>
-                    <Col xs={24} lg={12}>
-                        <Card title={<span className="font-bold text-gray-700">Quick Actions</span>} className="shadow-sm rounded-xl border-gray-100 h-full">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Link to="/packing" className="col-span-1">
-                                    <Button block size="large" type="primary" className="rounded-lg h-12 bg-purple-600 font-bold border-none hover:bg-purple-700">
-                                        Packing List
-                                    </Button>
-                                </Link>
-                                <Link to="/shipments" className="col-span-1">
-                                    <Button block size="large" className="rounded-lg h-12 font-bold border-purple-200 text-purple-600">
-                                        Shipments
-                                    </Button>
-                                </Link>
-                                <Button block size="large" className="rounded-lg h-12 text-gray-400" disabled>Reprint Docs</Button>
-                            </div>
-                        </Card>
+                    <Col xs={24} lg={8}>
+                        <div className="flex flex-col gap-6 h-full">
+                            {/* Daily Progress */}
+                            <Card title={<span className="font-bold text-gray-700">Daily Progress</span>} className="shadow-sm rounded-xl border-gray-100">
+                                <div className="text-center py-4">
+                                    <Progress
+                                        type="dashboard"
+                                        percent={data.goalProgress}
+                                        strokeColor={data.goalProgress >= 100 ? '#52c41a' : '#722ed1'}
+                                        gapDegree={60}
+                                        strokeWidth={10}
+                                        format={(percent) => (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-3xl font-black text-slate-800">{percent}%</span>
+                                                <span className="text-[10px] uppercase font-bold text-gray-400">Efficiency</span>
+                                            </div>
+                                        )}
+                                    />
+                                    <div className="mt-4 flex justify-between px-4 text-xs font-bold uppercase text-gray-500">
+                                        <span>Done: {data.stats.complete.value}</span>
+                                        <span>Total: {data.dailyGoal}</span>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
                     </Col>
                 </Row>
             </div>

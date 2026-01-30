@@ -176,9 +176,15 @@ export default function Picking() {
         }
     };
 
+    const shortenOrderNumber = (num) => {
+        if (!num) return '—';
+        const parts = num.split('-');
+        return parts.length === 3 ? `ORD-${parts[2]}` : num;
+    };
+
     const columns = [
         { title: 'Pick List', key: 'pn', render: (_, r) => <Link to={`/picking/${r.id}`} className="font-black text-indigo-600 italic tracking-tighter">PL-{String(r.id).slice(0, 8)}</Link> },
-        { title: 'Order', key: 'order', render: (_, r) => r.SalesOrder?.orderNumber || r.salesOrderId || '—' },
+        { title: 'Order', key: 'order', render: (_, r) => shortenOrderNumber(r.SalesOrder?.orderNumber || r.salesOrderId) },
         { title: 'Assigned To', key: 'picker', render: (_, r) => r.User?.name ? <Tag color="purple" className="font-bold">{r.User.name}</Tag> : <span className="text-gray-400 italic text-xs">Unassigned</span> },
         { title: 'Strategy', dataIndex: 'type', key: 'type', render: (t) => <Tag color="blue" className="font-bold">{t || 'SINGLE'}</Tag> },
         {
@@ -217,9 +223,8 @@ export default function Picking() {
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card className="rounded-2xl border-none shadow-sm bg-slate-900 text-white"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Live Queue</div><div className="text-3xl font-black">{pickLists.filter(x => (x.status || '').toUpperCase() !== 'PICKED').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Hot Zone</div><div className="text-3xl font-black">{pickLists.filter(x => x.priority === 'HIGH').length}</div></Card>
                     <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Dispatched</div><div className="text-3xl font-black">{pickLists.filter(x => (x.status || '').toUpperCase() === 'PICKED').length}</div></Card>
                     <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Units Picked</div><div className="text-3xl font-black">{pickLists.reduce((s, p) => s + ((p.PickListItems || p.pickItems || []).reduce((ss, i) => ss + (i.quantityPicked || 0), 0) || 0), 0)}</div></Card>
                 </div>
@@ -254,7 +259,7 @@ export default function Picking() {
                                 placeholder="Search confirmed orders..."
                                 className="h-11 rounded-xl"
                                 optionFilterProp="label"
-                                options={salesOrders.map(o => ({ value: o.id, label: `${o.orderNumber || 'ORD-' + o.id} ${(o.Customer?.name || o.customer?.name) ? ' – ' + (o.Customer?.name || o.customer?.name) : ''}` }))}
+                                options={salesOrders.map(o => ({ value: o.id, label: `${shortenOrderNumber(o.orderNumber)} ${(o.Customer?.name || o.customer?.name) ? ' – ' + (o.Customer?.name || o.customer?.name) : ''}` }))}
                             />
                         </Form.Item>
                         <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 mb-4">
@@ -267,7 +272,7 @@ export default function Picking() {
                 <Modal title="Assign Picker" open={assignModalOpen} onCancel={() => setAssignModalOpen(false)} onOk={() => assignForm.submit()} className="assign-modal">
                     {selectedPickList && (
                         <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                            <p><strong>Order #:</strong> {selectedPickList.SalesOrder?.orderNumber}</p>
+                            <p><strong>Order #:</strong> {shortenOrderNumber(selectedPickList.SalesOrder?.orderNumber)}</p>
                             <p><strong>Customer:</strong> {selectedPickList.SalesOrder?.Customer?.name || selectedPickList.SalesOrder?.customer?.name || 'N/A'}</p>
                             <p><strong>Items:</strong> {(selectedPickList.PickListItems || selectedPickList.pickItems || []).length}</p>
                         </div>
@@ -287,7 +292,7 @@ export default function Picking() {
                     {selectedPickList && (
                         <div className="text-center space-y-6">
                             <div className="bg-gray-50 p-4 rounded-xl">
-                                <h3 className="text-lg font-bold text-gray-800 mb-2">{selectedPickList.SalesOrder?.orderNumber}</h3>
+                                <h3 className="text-lg font-bold text-gray-800 mb-2">{shortenOrderNumber(selectedPickList.SalesOrder?.orderNumber)}</h3>
                                 <p className="text-gray-500">Pick List ID: PL-{selectedPickList.id}</p>
                                 <p className="text-gray-500">Customer: {selectedPickList.SalesOrder?.Customer?.name || selectedPickList.SalesOrder?.customer?.name || 'N/A'}</p>
                             </div>
@@ -303,7 +308,7 @@ export default function Picking() {
                     {selectedPickList && (
                         <div className="text-center space-y-6">
                             <div className="bg-gray-50 p-4 rounded-xl">
-                                <h3 className="text-lg font-bold text-gray-800 mb-2">{selectedPickList.SalesOrder?.orderNumber}</h3>
+                                <h3 className="text-lg font-bold text-gray-800 mb-2">{shortenOrderNumber(selectedPickList.SalesOrder?.orderNumber)}</h3>
                                 <p className="text-gray-500">Pick List ID: PL-{selectedPickList.id}</p>
                                 <p className="text-gray-500">Status: In Progress</p>
                             </div>

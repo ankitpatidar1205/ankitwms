@@ -17,10 +17,9 @@ export default function PickerDashboard() {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState({
         stats: {
-            ordersPickedToday: { value: 0, change: 0, trend: 'up' },
-            itemsPicked: { value: 0, change: 0, trend: 'up' },
-            accuracy: { value: 99, change: 0, trend: 'up' },
-            avgPickTime: { value: 0, change: 0, trend: 'down' },
+            pending: { value: 0, change: 0, trend: 'neutral' },
+            complete: { value: 0, change: 0, trend: 'up' },
+            issue: { value: 0, change: 0, trend: 'flat' },
         },
         pickingQueue: [],
         dailyGoal: 50,
@@ -34,28 +33,36 @@ export default function PickerDashboard() {
                 apiRequest('/api/dashboard/stats', { method: 'GET' }, token),
                 apiRequest('/api/picking', { method: 'GET' }, token).catch(() => ({ data: [] })),
             ]);
+
             const list = Array.isArray(pickingRes.data) ? pickingRes.data : [];
             const queue = list.map((pl) => ({
                 id: String(pl.id),
-                orderNumber: pl.SalesOrder?.orderNumber || `ORD-${pl.salesOrderId}`,
-                pickListNumber: `PL-${pl.id}`,
+                orderNumber: pl.SalesOrder?.orderNumber ? (pl.SalesOrder.orderNumber.split('-').length === 3 ? `ORD-${pl.SalesOrder.orderNumber.split('-')[2]}` : pl.SalesOrder.orderNumber) : '—',
+                customer: pl.SalesOrder?.Customer?.name || '-',
                 priority: pl.status === 'in_progress' ? 'high' : 'medium',
                 items: (pl.PickListItems && pl.PickListItems.length) || 0,
-                zone: pl.Warehouse?.name || '-',
-                estimatedTime: '-',
-                status: (pl.status || 'pending').toUpperCase().replace('_', '_'),
+                status: (pl.status || 'pending').toUpperCase().replace('_', ' '),
             }));
-            const pendingCount = list.filter((pl) => pl.status === 'pending' || pl.status === 'in_progress').length;
+
+            const pendingCount = list.filter((pl) => ['PENDING', 'IN_PROGRESS', 'ASSIGNED'].includes((pl.status || '').toUpperCase())).length;
+            const completedCount = list.filter((pl) => ['PICKED', 'COMPLETED'].includes((pl.status || '').toUpperCase())).length;
+
+            const d = statsRes.data || {};
+            // Prefer stats if available, else derived
+            const pickedToday = d.ordersPickedToday ?? completedCount;
+
+            const totalOrders = pendingCount + pickedToday;
+            const progressPercent = totalOrders > 0 ? Math.round((pickedToday / totalOrders) * 100) : 0;
+
             setData({
                 stats: {
-                    ordersPickedToday: { value: pendingCount, change: 0, trend: 'up' },
-                    itemsPicked: { value: list.reduce((acc, pl) => acc + ((pl.PickListItems && pl.PickListItems.length) || 0), 0), change: 0, trend: 'up' },
-                    accuracy: { value: 99, change: 0, trend: 'up' },
-                    avgPickTime: { value: 0, change: 0, trend: 'down' },
+                    pending: { value: pendingCount, change: 0, trend: 'neutral' },
+                    complete: { value: pickedToday, change: 0, trend: 'up' },
+                    issue: { value: 0, change: 0, trend: 'flat' },
                 },
-                pickingQueue: queue,
-                dailyGoal: 50,
-                goalProgress: Math.min(100, (pendingCount / 50) * 100),
+                pickingQueue: queue, // Show ALL
+                dailyGoal: totalOrders,
+                goalProgress: progressPercent,
             });
         } catch (_) {
             setData((prev) => ({ ...prev, pickingQueue: [] }));
@@ -73,13 +80,9 @@ export default function PickerDashboard() {
             title: 'Order #',
             dataIndex: 'orderNumber',
             key: 'orderNumber',
-            render: (text, record) => (
-                <div>
-                    <div className="font-medium text-blue-600">{text}</div>
-                    <div className="text-xs text-gray-500">{record.pickListNumber}</div>
-                </div>
-            )
+            render: (text) => <span className="font-bold text-blue-600">{text}</span>
         },
+        { title: 'Customer', dataIndex: 'customer', key: 'customer' },
         {
             title: 'Priority',
             dataIndex: 'priority',
@@ -93,33 +96,22 @@ export default function PickerDashboard() {
         },
         { title: 'Items', dataIndex: 'items', key: 'items', render: (val) => <span className="font-bold">{val}</span> },
         {
-            title: 'Zone',
-            dataIndex: 'zone',
-            key: 'zone',
-            render: (zone) => <Tag color="cyan" className="font-medium">{zone}</Tag>
-        },
-        { title: 'Est. Time', dataIndex: 'estimatedTime', key: 'estimatedTime', render: (val) => <span className="text-gray-500">{val}</span> },
-        {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
-            render: (status) => (
-                <Tag color={status === 'IN_PROGRESS' ? 'processing' : 'default'} className="rounded-full px-3">
-                    {status === 'IN_PROGRESS' ? 'In Progress' : 'Pending'}
-                </Tag>
-            ),
-        },
-        {
-            title: 'Action',
-            key: 'action',
-            render: (_, record) => (
-                <Link to={`/picking/${record.id}`}>
-                    <Button type="primary" size="small" className="rounded-lg">
-                        {record.status === 'IN_PROGRESS' ? 'Continue' : 'Start'}
-                    </Button>
-                </Link>
-            ),
-        },
+            render: (status) => {
+                let color = 'default';
+                let label = status;
+                if (status === 'IN PROGRESS') { color = 'processing'; label = 'In Progress'; }
+                if (['PICKED', 'COMPLETED'].includes(status)) { color = 'success'; label = 'Picked'; }
+
+                return (
+                    <Tag color={color} className="rounded-full px-3 font-bold">
+                        {label}
+                    </Tag>
+                );
+            },
+        }
     ];
 
     if (loading) return <MainLayout><div className="flex justify-center items-center min-h-[200px]"><Spin size="large" /></div></MainLayout>;
@@ -144,114 +136,90 @@ export default function PickerDashboard() {
 
                 {/* KPI Cards */}
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} lg={6}>
+                    <Col xs={24} sm={8}>
                         <KPICard
-                            title="Orders Picked Today"
-                            value={data.stats.ordersPickedToday.value}
-                            change={data.stats.ordersPickedToday.change}
-                            trend={data.stats.ordersPickedToday.trend}
-                            icon={<ShoppingCartOutlined />}
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Items Picked"
-                            value={data.stats.itemsPicked.value}
-                            change={data.stats.itemsPicked.change}
-                            trend={data.stats.itemsPicked.trend}
-                            icon={<CheckCircleOutlined />}
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Accuracy Rate"
-                            value={data.stats.accuracy.value}
-                            change={data.stats.accuracy.change}
-                            trend={data.stats.accuracy.trend}
-                            icon={<TrophyOutlined />}
-                            suffix="%"
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Avg Pick Time"
-                            value={data.stats.avgPickTime.value}
-                            change={data.stats.avgPickTime.change}
-                            trend={data.stats.avgPickTime.trend}
+                            title="Pending Picks"
+                            value={data.stats.pending.value}
+                            change={data.stats.pending.change}
+                            trend={data.stats.pending.trend}
                             icon={<ClockCircleOutlined />}
-                            suffix="min"
+                            color="orange"
+                        />
+                    </Col>
+                    <Col xs={24} sm={8}>
+                        <KPICard
+                            title="Picked Today"
+                            value={data.stats.complete.value}
+                            change={data.stats.complete.change}
+                            trend={data.stats.complete.trend}
+                            icon={<CheckCircleOutlined />}
+                            color="green"
+                        />
+                    </Col>
+                    <Col xs={24} sm={8}>
+                        <KPICard
+                            title="Issues"
+                            value={data.stats.issue.value}
+                            change={data.stats.issue.change}
+                            trend={data.stats.issue.trend}
+                            icon={<ReloadOutlined />}
+                            color="red"
                         />
                     </Col>
                 </Row>
 
-                {/* Picking Queue */}
-                <Card
-                    title={<span className="font-bold text-gray-700">Assignments Queue</span>}
-                    className="shadow-sm rounded-xl border-gray-100"
-                    extra={
-                        <Tag color={data.pickingQueue.length > 0 ? 'blue' : 'green'} className="rounded-full px-3 font-bold">
-                            {data.pickingQueue.length} Pending
-                        </Tag>
-                    }
-                >
-                    {data.pickingQueue.length > 0 ? (
-                        <Table
-                            dataSource={data.pickingQueue}
-                            columns={columns}
-                            rowKey="id"
-                            pagination={false}
-                            size="middle"
-                        />
-                    ) : (
-                        <Empty
-                            description="No pending pick lists. Great job!"
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        />
-                    )}
-                </Card>
-
-                {/* Performance Summary */}
+                {/* Table & Progress */}
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} lg={12}>
-                        <Card title={<span className="font-bold text-gray-700">Goals & Targets</span>} className="shadow-sm rounded-xl border-gray-100 h-full">
-                            <div className="space-y-6">
-                                <div>
-                                    <div className="flex justify-between mb-2">
-                                        <span className="text-gray-500 font-medium text-sm">Daily Goal Progress</span>
-                                        <span className="font-bold text-blue-600">{data.stats.ordersPickedToday.value} / {data.dailyGoal} orders</span>
-                                    </div>
-                                    <Progress
-                                        percent={data.goalProgress}
-                                        status={data.goalProgress >= 100 ? 'success' : 'active'}
-                                        strokeColor={{ '0%': '#1890ff', '100%': '#52c41a' }}
-                                        strokeWidth={10}
-                                    />
-                                </div>
-                                <div>
-                                    <div className="flex justify-between mb-2">
-                                        <span className="text-gray-500 font-medium text-sm">Accuracy Target</span>
-                                        <span className="font-bold text-green-600">{data.stats.accuracy.value}% / 98%</span>
-                                    </div>
-                                    <Progress
-                                        percent={Math.min(100, (data.stats.accuracy.value / 98) * 100)}
-                                        status={data.stats.accuracy.value >= 98 ? 'success' : 'normal'}
-                                        strokeWidth={10}
-                                    />
-                                </div>
-                            </div>
+                    <Col xs={24} lg={16}>
+                        <Card
+                            title={<span className="font-bold text-gray-700">Assignments Queue</span>}
+                            className="shadow-sm rounded-xl border-gray-100 h-full"
+                            extra={
+                                <Tag color="purple" className="rounded-full px-3 font-bold">
+                                    {data.pickingQueue.length} Orders
+                                </Tag>
+                            }
+                        >
+                            {data.pickingQueue.length > 0 ? (
+                                <Table
+                                    dataSource={data.pickingQueue}
+                                    columns={columns}
+                                    rowKey="id"
+                                    pagination={{ pageSize: 8 }}
+                                    size="middle"
+                                />
+                            ) : (
+                                <Empty
+                                    description="No pending pick lists. Great job!"
+                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                />
+                            )}
                         </Card>
                     </Col>
-                    <Col xs={24} lg={12}>
-                        <Card title={<span className="font-bold text-gray-700">Actions</span>} className="shadow-sm rounded-xl border-gray-100 h-full">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Link to="/picking" className="col-span-2">
-                                    <Button block size="large" type="primary" className="rounded-lg h-12 font-bold shadow-md">
-                                        View All Pick Lists
-                                    </Button>
-                                </Link>
-                                <Button block size="large" className="rounded-lg h-12 text-gray-400" disabled>Report Issue</Button>
-                            </div>
-                        </Card>
+                    <Col xs={24} lg={8}>
+                        <div className="flex flex-col gap-6 h-full">
+                            <Card title={<span className="font-bold text-gray-700">Daily Progress</span>} className="shadow-sm rounded-xl border-gray-100">
+                                <div className="text-center py-4">
+                                    <Progress
+                                        type="dashboard"
+                                        percent={data.goalProgress}
+                                        strokeColor={data.goalProgress >= 100 ? '#52c41a' : '#1890ff'}
+                                        gapDegree={60}
+                                        strokeWidth={10}
+                                        format={(percent) => (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-3xl font-black text-slate-800">{percent}%</span>
+                                                <span className="text-[10px] uppercase font-bold text-gray-400">Velocity</span>
+                                            </div>
+                                        )}
+                                    />
+                                    <div className="mt-4 flex justify-between px-4 text-xs font-bold uppercase text-gray-500">
+                                        <span>Done: {data.stats.complete.value}</span>
+                                        <span>Total: {data.dailyGoal}</span>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
                     </Col>
                 </Row>
             </div>
