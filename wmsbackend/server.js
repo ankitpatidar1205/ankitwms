@@ -70,6 +70,9 @@ app.delete('/api/goods-receiving/:id', authenticate, requireRole(...grWriteRoles
 const invProductRoles = ['super_admin', 'company_admin', 'inventory_manager'];
 app.delete('/api/inventory/products/:id', authenticate, requireRole(...invProductRoles), inventoryController.removeProduct);
 
+const returnRoutes = require('./routes/returnRoutes');
+app.use('/api/returns', returnRoutes);
+
 app.use(routes);
 
 app.use((err, req, res, next) => {
@@ -139,4 +142,5 @@ async function start() {
   }
 }
 
+// Retrying server start to pick up new routes
 start();
