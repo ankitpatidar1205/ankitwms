@@ -21,6 +21,10 @@ const PurchaseOrder = require('./PurchaseOrder');
 const PurchaseOrderItem = require('./PurchaseOrderItem');
 const GoodsReceipt = require('./GoodsReceipt');
 const GoodsReceiptItem = require('./GoodsReceiptItem');
+const InventoryAdjustment = require('./InventoryAdjustment');
+const CycleCount = require('./CycleCount');
+const Batch = require('./Batch');
+const Movement = require('./Movement');
 
 // Company
 Company.hasMany(User, { foreignKey: 'companyId' });
@@ -47,6 +51,48 @@ PurchaseOrder.hasMany(PurchaseOrderItem, { foreignKey: 'purchaseOrderId' });
 PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: 'purchaseOrderId' });
 PurchaseOrderItem.belongsTo(Product, { foreignKey: 'productId' });
 Product.hasMany(PurchaseOrderItem, { foreignKey: 'productId' });
+
+// InventoryAdjustment
+Company.hasMany(InventoryAdjustment, { foreignKey: 'companyId' });
+InventoryAdjustment.belongsTo(Company, { foreignKey: 'companyId' });
+InventoryAdjustment.belongsTo(Product, { foreignKey: 'productId' });
+Product.hasMany(InventoryAdjustment, { foreignKey: 'productId' });
+InventoryAdjustment.belongsTo(Warehouse, { foreignKey: 'warehouseId' });
+Warehouse.hasMany(InventoryAdjustment, { foreignKey: 'warehouseId' });
+InventoryAdjustment.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
+User.hasMany(InventoryAdjustment, { foreignKey: 'createdBy', as: 'CreatedInventoryAdjustments' });
+
+// CycleCount
+Company.hasMany(CycleCount, { foreignKey: 'companyId' });
+CycleCount.belongsTo(Company, { foreignKey: 'companyId' });
+CycleCount.belongsTo(Location, { foreignKey: 'locationId' });
+Location.hasMany(CycleCount, { foreignKey: 'locationId' });
+CycleCount.belongsTo(User, { foreignKey: 'countedBy', as: 'countedByUser' });
+User.hasMany(CycleCount, { foreignKey: 'countedBy', as: 'countedByUser' });
+
+// Batch
+Company.hasMany(Batch, { foreignKey: 'companyId' });
+Batch.belongsTo(Company, { foreignKey: 'companyId' });
+Batch.belongsTo(Product, { foreignKey: 'productId' });
+Product.hasMany(Batch, { foreignKey: 'productId' });
+Batch.belongsTo(Warehouse, { foreignKey: 'warehouseId' });
+Warehouse.hasMany(Batch, { foreignKey: 'warehouseId' });
+Batch.belongsTo(Location, { foreignKey: 'locationId' });
+Location.hasMany(Batch, { foreignKey: 'locationId' });
+Batch.belongsTo(Supplier, { foreignKey: 'supplierId' });
+Supplier.hasMany(Batch, { foreignKey: 'supplierId' });
+
+// Movement
+Company.hasMany(Movement, { foreignKey: 'companyId' });
+Movement.belongsTo(Company, { foreignKey: 'companyId' });
+Movement.belongsTo(Product, { foreignKey: 'productId' });
+Product.hasMany(Movement, { foreignKey: 'productId' });
+Movement.belongsTo(Batch, { foreignKey: 'batchId' });
+Batch.hasMany(Movement, { foreignKey: 'batchId' });
+Movement.belongsTo(Location, { foreignKey: 'fromLocationId', as: 'fromLocation' });
+Movement.belongsTo(Location, { foreignKey: 'toLocationId', as: 'toLocation' });
+Movement.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
+User.hasMany(Movement, { foreignKey: 'createdBy', as: 'CreatedMovements' });
 
 // GoodsReceipt
 Company.hasMany(GoodsReceipt, { foreignKey: 'companyId' });
@@ -143,4 +189,8 @@ module.exports = {
   PurchaseOrderItem,
   GoodsReceipt,
   GoodsReceiptItem,
+  InventoryAdjustment,
+  CycleCount,
+  Batch,
+  Movement,
 };

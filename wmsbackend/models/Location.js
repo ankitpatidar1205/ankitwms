@@ -13,6 +13,7 @@ const Location = sequelize.define('Location', {
   locationType: { type: DataTypes.STRING },
   pickSequence: { type: DataTypes.INTEGER },
   maxWeight: { type: DataTypes.DECIMAL(10, 2) },
+  heatSensitive: { type: DataTypes.STRING, allowNull: true },
 }, {
   tableName: 'locations',
   timestamps: true,

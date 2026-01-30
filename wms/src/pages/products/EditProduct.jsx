@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Form, Input, Select, InputNumber, Button, message, Upload, Row, Col, Tabs, Spin } from 'antd';
+import { Card, Form, Input, Select, InputNumber, Button, message, Upload, Row, Col, Tabs, Spin, Modal, Table } from 'antd';
 import {
     ArrowLeftOutlined,
     SaveOutlined,
@@ -8,15 +8,16 @@ import {
     InboxOutlined,
     GlobalOutlined,
     BankOutlined,
-    ApartmentOutlined,
     ColumnWidthOutlined,
     PictureOutlined,
     PlusOutlined,
+    DeleteOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { apiRequest } from '../../api/client';
+import { formatCurrency } from '../../utils';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -41,6 +42,12 @@ export default function EditProduct() {
     const [suppliers, setSuppliers] = useState([]);
     const [imageList, setImageList] = useState([]);
     const [productSku, setProductSku] = useState('');
+    const [cartonList, setCartonList] = useState([]);
+    const [supplierProductList, setSupplierProductList] = useState([]);
+    const [cartonModalOpen, setCartonModalOpen] = useState(false);
+    const [priceListModalOpen, setPriceListModalOpen] = useState(false);
+    const [cartonForm] = Form.useForm();
+    const [priceListForm] = Form.useForm();
 
     const fetchProduct = useCallback(async () => {
         if (!token || !id) return;
@@ -87,19 +94,18 @@ export default function EditProduct() {
                 reorderLevel: p.reorderLevel ?? 0,
                 reorderQty: p.reorderQty ?? undefined,
                 maxStock: p.maxStock ?? undefined,
-                unitsPerCarton: p.cartons?.unitsPerCarton ?? undefined,
-                cartonBarcode: p.cartons?.barcode ?? undefined,
-                cartonLength: p.cartons?.length ?? undefined,
-                cartonWidth: p.cartons?.width ?? undefined,
-                cartonHeight: p.cartons?.height ?? undefined,
-                cartonWeight: p.cartons?.weight ?? undefined,
-                listPrice: p.priceLists?.listPrice ?? undefined,
-                wholesalePrice: p.priceLists?.wholesalePrice ?? undefined,
-                retailPrice: p.priceLists?.retailPrice ?? undefined,
-                minOrderPrice: p.priceLists?.minOrderPrice ?? undefined,
             });
             const imgs = Array.isArray(p.images) ? p.images : [];
             setImageList(imgs.map((url, idx) => ({ uid: `existing-${idx}`, url, name: `image-${idx}` })));
+            const cartonsRaw = p.cartons;
+            const cartonsArr = Array.isArray(cartonsRaw)
+                ? cartonsRaw.map((c, i) => ({ id: c.id || `c-${i}`, barcode: c.barcode ?? '', caseSize: c.caseSize ?? '', description: c.description ?? '' }))
+                : cartonsRaw && typeof cartonsRaw === 'object' && (cartonsRaw.barcode || cartonsRaw.unitsPerCarton)
+                    ? [{ id: 'c-0', barcode: cartonsRaw.barcode ?? '', caseSize: cartonsRaw.unitsPerCarton ?? '', description: cartonsRaw.description ?? '' }]
+                    : [];
+            setCartonList(cartonsArr);
+            const spList = Array.isArray(p.supplierProducts) ? p.supplierProducts : [];
+            setSupplierProductList(spList.map((s, i) => ({ ...s, id: s.id || `sp-${i}` })));
         } catch (err) {
             message.error(err?.data?.message || err?.message || 'Failed to load product');
             navigate('/products');
@@ -207,20 +213,15 @@ export default function EditProduct() {
                 maxStock: values.maxStock != null ? values.maxStock : null,
                 status: values.status || 'ACTIVE',
                 images: imageList.map((i) => i.url),
-                cartons: {
-                    unitsPerCarton: values.unitsPerCarton != null ? values.unitsPerCarton : null,
-                    barcode: values.cartonBarcode || null,
-                    length: values.cartonLength != null ? values.cartonLength : null,
-                    width: values.cartonWidth != null ? values.cartonWidth : null,
-                    height: values.cartonHeight != null ? values.cartonHeight : null,
-                    weight: values.cartonWeight != null ? values.cartonWeight : null,
-                },
-                priceLists: {
-                    listPrice: values.listPrice != null ? values.listPrice : null,
-                    wholesalePrice: values.wholesalePrice != null ? values.wholesalePrice : null,
-                    retailPrice: values.retailPrice != null ? values.retailPrice : null,
-                    minOrderPrice: values.minOrderPrice != null ? values.minOrderPrice : null,
-                },
+                cartons: cartonList.map((c) => ({ id: c.id, barcode: c.barcode || null, caseSize: c.caseSize != null ? c.caseSize : null, description: c.description || null })),
+                supplierProducts: supplierProductList.map((s) => ({
+                    id: s.id,
+                    supplierId: s.supplierId,
+                    supplierSku: s.supplierSku ?? null,
+                    caseSize: s.caseSize != null ? s.caseSize : null,
+                    caseCost: s.caseCost != null ? s.caseCost : null,
+                    unitCost: s.unitCost != null ? s.unitCost : null,
+                })),
             };
             await apiRequest(`/api/inventory/products/${id}`, { method: 'PUT', body: JSON.stringify(payload) }, token);
             message.success('Product updated successfully!');
@@ -270,17 +271,12 @@ export default function EditProduct() {
                                 <Input placeholder="e.g. PRD-001" className="rounded-lg" size="large" />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Type" name="productType">
-                                <Select className="rounded-lg w-full" size="large" options={[{ value: 'SIMPLE', label: 'Simple' }, { value: 'BUNDLE', label: 'Bundle' }]} />
+                        <Col xs={24} md={12}>
+                            <Form.Item label="Barcode" name="barcode">
+                                <Input placeholder="Enter barcode (EAN/UPC)" className="rounded-lg" size="large" />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Status" name="status">
-                                <Select className="rounded-lg w-full" size="large" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
+                        <Col xs={24} md={12}>
                             <Form.Item label="Category" name="categoryId">
                                 <Select allowClear placeholder="Select category" className="rounded-lg w-full" size="large">
                                     {categories.map((c) => (
@@ -290,8 +286,13 @@ export default function EditProduct() {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label="Barcode" name="barcode">
-                                <Input placeholder="Enter barcode (EAN/UPC)" className="rounded-lg" size="large" />
+                            <Form.Item label="Type" name="productType">
+                                <Select className="rounded-lg w-full" size="large" options={[{ value: 'SIMPLE', label: 'Simple' }, { value: 'BUNDLE', label: 'Bundle' }]} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                            <Form.Item label="Status" name="status">
+                                <Select className="rounded-lg w-full" size="large" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
@@ -371,39 +372,50 @@ export default function EditProduct() {
             ),
             children: (
                 <Card className="rounded-2xl shadow-sm border-gray-100">
-                    <p className="text-gray-500 text-sm mb-4">Carton / pack configuration (units per carton, dimensions, weight, barcode).</p>
-                    <Row gutter={16}>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Units per Carton" name="unitsPerCarton">
-                                <InputNumber className="w-full rounded-lg" size="large" min={1} placeholder="e.g. 12" />
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-slate-800">Outer Carton Configurations</h3>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => { cartonForm.resetFields(); setCartonModalOpen(true); }} className="bg-blue-600 border-blue-600">+ Add Carton Barcode</Button>
+                    </div>
+                    <Table
+                        size="small"
+                        dataSource={cartonList}
+                        rowKey="id"
+                        pagination={false}
+                        columns={[
+                            { title: 'Barcode', dataIndex: 'barcode', key: 'barcode', render: (v) => v || '—' },
+                            { title: 'Case Size (Units Inside)', dataIndex: 'caseSize', key: 'caseSize', render: (v) => (v != null && v !== '' ? String(v) : '—') },
+                            { title: 'Description', dataIndex: 'description', key: 'description', render: (v) => v || '—' },
+                            {
+                                title: 'Actions',
+                                key: 'actions',
+                                render: (_, r) => (
+                                    <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => setCartonList((prev) => prev.filter((c) => c.id !== r.id))}>Delete</Button>
+                                ),
+                            },
+                        ]}
+                    />
+                    <Modal title="Add Carton Barcode" open={cartonModalOpen} onCancel={() => setCartonModalOpen(false)} footer={null} destroyOnClose>
+                        <Form form={cartonForm} layout="vertical" onFinish={(values) => {
+                            const id = `c-${Date.now()}`;
+                            setCartonList((prev) => [...prev, { id, barcode: values.outerBarcode?.trim() || '', caseSize: values.caseSize != null ? Number(values.caseSize) : null, description: values.description?.trim() || '' }]);
+                            cartonForm.resetFields();
+                            setCartonModalOpen(false);
+                        }}>
+                            <Form.Item name="outerBarcode" label="Outer Barcode" rules={[{ required: true, message: 'Required' }]}>
+                                <Input placeholder="Scan or enter case barcode" className="rounded-lg" />
                             </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Carton Barcode" name="cartonBarcode">
-                                <Input placeholder="Carton barcode (EAN/UPC)" className="rounded-lg" size="large" />
+                            <Form.Item name="caseSize" label="Case Size (Units Inside)" rules={[{ required: true, message: 'Required' }]}>
+                                <InputNumber className="w-full rounded-lg" min={1} placeholder="e.g. 48" />
                             </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Length (cm)" name="cartonLength">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} />
+                            <Form.Item name="description" label="Description">
+                                <Input placeholder="e.g. Case of 48" className="rounded-lg" />
                             </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Width (cm)" name="cartonWidth">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Height (cm)" name="cartonHeight">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item label="Weight (kg)" name="cartonWeight">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.001} />
-                            </Form.Item>
-                        </Col>
-                    </Row>
+                            <div className="flex justify-end gap-2">
+                                <Button onClick={() => setCartonModalOpen(false)}>Cancel</Button>
+                                <Button type="primary" htmlType="submit" className="bg-blue-600 border-blue-600">OK</Button>
+                            </div>
+                        </Form>
+                    </Modal>
                 </Card>
             ),
         },
@@ -416,29 +428,72 @@ export default function EditProduct() {
             ),
             children: (
                 <Card className="rounded-2xl shadow-sm border-gray-100">
-                    <p className="text-gray-500 text-sm mb-4">Price list overrides (List, Wholesale, Retail, Min order).</p>
-                    <Row gutter={16}>
-                        <Col xs={24} md={12}>
-                            <Form.Item label="List Price" name="listPrice">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-slate-800">Supplier Price Lists</h3>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => { priceListForm.resetFields(); setPriceListModalOpen(true); }} className="bg-blue-600 border-blue-600">+ Add Price List</Button>
+                    </div>
+                    {(() => {
+                        const getSupplierName = (sid) => { const s = suppliers.find((x) => x.id === sid); return s ? s.name : (sid != null ? `ID ${sid}` : '—'); };
+                        return (
+                            <Table
+                                size="small"
+                                dataSource={supplierProductList}
+                                rowKey="id"
+                                pagination={false}
+                                columns={[
+                                    { title: 'Supplier', key: 'supplier', render: (_, r) => getSupplierName(r.supplierId) },
+                                    { title: 'Supplier SKU', dataIndex: 'supplierSku', key: 'supplierSku', render: (v) => v || '—' },
+                                    { title: 'Case Size', dataIndex: 'caseSize', key: 'caseSize', render: (v) => (v != null ? String(v) : '—') },
+                                    { title: 'Case Cost', dataIndex: 'caseCost', key: 'caseCost', render: (v) => (v != null ? formatCurrency(v) : '—') },
+                                    { title: 'Unit Cost', dataIndex: 'unitCost', key: 'unitCost', render: (v) => (v != null ? formatCurrency(v) : '—') },
+                                    {
+                                        title: 'Actions',
+                                        key: 'actions',
+                                        render: (_, r) => (
+                                            <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => setSupplierProductList((prev) => prev.filter((s) => s.id !== r.id))}>Delete</Button>
+                                        ),
+                                    },
+                                ]}
+                            />
+                        );
+                    })()}
+                    <Modal title="Add Supplier Price List" open={priceListModalOpen} onCancel={() => setPriceListModalOpen(false)} footer={null} destroyOnClose>
+                        <Form form={priceListForm} layout="vertical" onFinish={(values) => {
+                            const caseCost = values.caseCostPrice != null ? Number(values.caseCostPrice) : null;
+                            const caseSize = values.caseSize != null ? Number(values.caseSize) : 1;
+                            const unitCost = caseCost != null && caseSize > 0 ? (caseCost / caseSize).toFixed(4) : null;
+                            const id = `sp-${Date.now()}`;
+                            setSupplierProductList((prev) => [...prev, {
+                                id,
+                                supplierId: values.supplierId,
+                                supplierSku: values.supplierSku?.trim() || '',
+                                caseSize,
+                                caseCost,
+                                unitCost,
+                            }]);
+                            priceListForm.resetFields();
+                            setPriceListModalOpen(false);
+                        }}>
+                            <Form.Item name="supplierId" label="Supplier" rules={[{ required: true, message: 'Required' }]}>
+                                <Select placeholder="Select supplier" className="rounded-lg w-full" allowClear>
+                                    {suppliers.map((s) => <Option key={s.id} value={s.id}>{s.name}</Option>)}
+                                </Select>
                             </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item label="Wholesale Price" name="wholesalePrice">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
+                            <Form.Item name="supplierSku" label="Supplier SKU (Case SKU)" rules={[{ required: true, message: 'Required' }]}>
+                                <Input placeholder="Supplier SKU" className="rounded-lg" />
                             </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item label="Retail Price" name="retailPrice">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
+                            <Form.Item name="caseSize" label="Case Size" rules={[{ required: true, message: 'Required' }]}>
+                                <InputNumber className="w-full rounded-lg" min={1} placeholder="e.g. 48" />
                             </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item label="Minimum Order Price" name="minOrderPrice">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
+                            <Form.Item name="caseCostPrice" label="Case Cost Price" rules={[{ required: true, message: 'Required' }]}>
+                                <InputNumber className="w-full rounded-lg" min={0} step={0.01} addonBefore="£" placeholder="0.00" />
                             </Form.Item>
-                        </Col>
-                    </Row>
+                            <div className="flex justify-end gap-2">
+                                <Button onClick={() => setPriceListModalOpen(false)}>Cancel</Button>
+                                <Button type="primary" htmlType="submit" className="bg-blue-600 border-blue-600">OK</Button>
+                            </div>
+                        </Form>
+                    </Modal>
                 </Card>
             ),
         },
@@ -624,7 +679,7 @@ export default function EditProduct() {
 
     return (
         <MainLayout>
-            <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+            <div className="w-full space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center gap-4">
                         <Link to="/products" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium">

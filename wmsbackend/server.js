@@ -8,6 +8,7 @@ const superadminController = require('./controllers/superadminController');
 const purchaseOrderController = require('./controllers/purchaseOrderController');
 const goodsReceiptController = require('./controllers/goodsReceiptController');
 const orderController = require('./controllers/orderController');
+const inventoryController = require('./controllers/inventoryController');
 const { authenticate, requireSuperAdmin, requireRole } = require('./middlewares/auth');
 const dashboardController = require('./controllers/dashboardController');
 
@@ -15,8 +16,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Sales orders - register FIRST so DELETE /api/orders/sales/:id never 404s
 const soRoles = ['super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager', 'picker', 'packer', 'viewer'];
@@ -59,6 +60,10 @@ app.get('/api/goods-receiving/:id', authenticate, requireRole(...grRoles), goods
 app.post('/api/goods-receiving', authenticate, requireRole(...grWriteRoles), goodsReceiptController.create);
 app.put('/api/goods-receiving/:id/receive', authenticate, requireRole(...grWriteRoles), goodsReceiptController.updateReceived);
 app.delete('/api/goods-receiving/:id', authenticate, requireRole(...grWriteRoles), goodsReceiptController.remove);
+
+// Inventory products - explicit DELETE so /api/inventory/products/:id never 404s
+const invProductRoles = ['super_admin', 'company_admin', 'inventory_manager'];
+app.delete('/api/inventory/products/:id', authenticate, requireRole(...invProductRoles), inventoryController.removeProduct);
 
 app.use(routes);
 

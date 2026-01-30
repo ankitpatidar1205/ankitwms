@@ -40,11 +40,12 @@ export const MainLayout = ({ children }) => {
     const { sidebarCollapsed, toggleSidebar } = useUIStore();
     const [openKeys, setOpenKeys] = useState([]);
 
-    // Set initial open keys based on current path
+    // Current path ka parent submenu open rakho; openKeys replace mat karo taaki dropdown apne aap band na ho
     useEffect(() => {
         const pathParts = location.pathname.split('/').filter(Boolean);
         if (pathParts.length > 1) {
-            setOpenKeys([`nav-${pathParts[0]}`]);
+            const parentKey = `nav-${pathParts[0]}`;
+            setOpenKeys((prev) => (prev.includes(parentKey) ? prev : [...prev, parentKey]));
         }
     }, [location.pathname]);
 
@@ -146,6 +147,7 @@ export const MainLayout = ({ children }) => {
             children: [
                 { key: '/products', label: 'Add/Edit Products' },
                 { key: '/products/categories', label: 'SKU / Categories' },
+                { key: '/products/import-export', label: 'Import/Export' },
             ],
         },
         {
@@ -205,6 +207,7 @@ export const MainLayout = ({ children }) => {
                 { key: '/products', label: 'All Products' },
                 { key: '/products/categories', label: 'Categories' },
                 { key: '/products/bundles', label: 'Bundles' },
+                { key: '/products/import-export', label: 'Import/Export' },
             ],
         },
         {
@@ -213,8 +216,11 @@ export const MainLayout = ({ children }) => {
             label: 'Inventory',
             children: [
                 { key: '/inventory', label: 'Overview' },
+                { key: '/inventory/by-best-before-date', label: 'By Best Before Date' },
+                { key: '/inventory/by-location', label: 'By Location' },
                 { key: '/inventory/adjustments', label: 'Adjustments' },
                 { key: '/inventory/cycle-counts', label: 'Cycle Counts' },
+                { key: '/inventory/batches', label: 'Batches' },
                 { key: '/inventory/movements', label: 'Movements' },
             ],
         },
@@ -357,7 +363,12 @@ export const MainLayout = ({ children }) => {
                     mode="inline"
                     selectedKeys={[location.pathname]}
                     openKeys={openKeys}
-                    onOpenChange={setOpenKeys}
+                    onOpenChange={(keys) => {
+                        // Sub-route pe ho to dropdown apne aap band na ho
+                        const pathParts = location.pathname.split('/').filter(Boolean);
+                        if (keys.length === 0 && pathParts.length > 1) return;
+                        setOpenKeys(keys);
+                    }}
                     items={menuItems}
                     onClick={handleMenuClick}
                     className="bg-transparent border-none mt-4 px-2 custom-sidebar-menu"

@@ -8,6 +8,11 @@ const ProductStock = sequelize.define('ProductStock', {
   locationId: { type: DataTypes.INTEGER, allowNull: true },
   quantity: { type: DataTypes.INTEGER, defaultValue: 0 },
   reserved: { type: DataTypes.INTEGER, defaultValue: 0 },
+  status: { type: DataTypes.STRING, defaultValue: 'ACTIVE' },
+  lotNumber: { type: DataTypes.STRING, allowNull: true },
+  batchNumber: { type: DataTypes.STRING, allowNull: true },
+  serialNumber: { type: DataTypes.STRING, allowNull: true },
+  bestBeforeDate: { type: DataTypes.DATEONLY, allowNull: true },
 }, {
   tableName: 'product_stocks',
   timestamps: true,

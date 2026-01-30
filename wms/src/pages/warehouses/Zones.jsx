@@ -1,22 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Tag, Card, Space, Modal, Form, Input, Select, Drawer, Badge, Typography, message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Tag, Card, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined, ReloadOutlined, EnvironmentOutlined, HomeOutlined } from '@ant-design/icons';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { useAuthStore } from '../../store/authStore';
 import { apiRequest } from '../../api/client';
 
 const { Option } = Select;
 const { Search } = Input;
-const { Title } = Typography;
+
+const ZONE_TYPE_LABELS = { STANDARD: 'Standard', COLD: 'Cold', FROZEN: 'Frozen', HAZMAT: 'Hazmat', QUARANTINE: 'Quarantine' };
 
 export default function Zones() {
     const { token } = useAuthStore();
     const [loading, setLoading] = useState(false);
     const [zones, setZones] = useState([]);
     const [warehouses, setWarehouses] = useState([]);
+    const [searchText, setSearchText] = useState('');
     const [selectedZone, setSelectedZone] = useState(null);
     const [modalOpen, setModalOpen] = useState(false);
-    const [detailOpen, setDetailOpen] = useState(false);
+    const [viewMode, setViewMode] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form] = Form.useForm();
 
@@ -72,20 +74,45 @@ export default function Zones() {
         }
     };
 
+    const handleDelete = async (id) => {
+        try {
+            await apiRequest(`/api/zones/${id}`, { method: 'DELETE' }, token);
+            message.success('Zone deleted');
+            fetchZones();
+        } catch (err) {
+            message.error(err?.message || 'Failed to delete');
+        }
+    };
+
+    const filteredZones = zones.filter(z => {
+        if (!searchText) return true;
+        const s = searchText.toLowerCase();
+        const name = (z.name || '').toLowerCase();
+        const code = (z.code || '').toLowerCase();
+        const whName = (z.Warehouse?.name || '').toLowerCase();
+        const whCode = (z.Warehouse?.code || '').toLowerCase();
+        return name.includes(s) || code.includes(s) || whName.includes(s) || whCode.includes(s);
+    });
+
     const columns = [
-        { title: 'Zone Code', dataIndex: 'code', key: 'code', render: (v) => <Tag color="blue" className="font-black border-none uppercase text-[10px]">{v || '—'}</Tag> },
-        { title: 'Zone Name', dataIndex: 'name', key: 'name', render: (v) => <span className="font-bold text-slate-700">{v}</span> },
-        { title: 'Warehouse', dataIndex: ['Warehouse', 'name'], key: 'wh', render: (_, r) => r.Warehouse?.name || '—' },
-        { title: 'Zone Type', dataIndex: 'zoneType', key: 'type', render: (t) => <Tag color={t === 'COLD' ? 'cyan' : t === 'FROZEN' ? 'blue' : 'default'} bordered={false}>{t || '—'}</Tag> },
-        { title: 'Asset Capacity', key: 'locs', render: (_, r) => <Badge count={r.locations?.length || 0} showZero color="#6366f1" /> },
+        { title: 'Zone Code', dataIndex: 'code', key: 'code', width: 120, render: (v) => <span className="font-medium text-blue-600">{v || '—'}</span> },
+        { title: 'Zone Name', dataIndex: 'name', key: 'name', render: (v) => <span className="flex items-center gap-2"><EnvironmentOutlined className="text-gray-400" />{v || '—'}</span> },
+        { title: 'Warehouse', key: 'wh', render: (_, r) => r.Warehouse ? <span className="flex items-center gap-2"><HomeOutlined className="text-gray-400" />{r.Warehouse.name} ({r.Warehouse.code})</span> : '—' },
+        { title: 'Zone Type', dataIndex: 'zoneType', key: 'zoneType', width: 120, render: (t) => t ? <Tag color={t === 'COLD' ? 'cyan' : t === 'FROZEN' ? 'blue' : t === 'HAZMAT' || t === 'QUARANTINE' ? 'red' : 'default'}>{t}</Tag> : '—' },
+        { title: 'Locations', key: 'locs', width: 100, render: (_, r) => <span className="text-purple-600 font-medium">{(r.locations?.length ?? 0)}</span> },
+        { title: 'Created', dataIndex: 'createdAt', key: 'created', width: 100, render: (v) => v ? new Date(v).toLocaleDateString() : '—' },
         {
-            title: 'Protocol',
+            title: 'Actions',
             key: 'act',
+            width: 140,
+            fixed: 'right',
             render: (_, r) => (
                 <Space>
-                    <Button type="text" icon={<EyeOutlined />} onClick={() => { setSelectedZone(r); setDetailOpen(true); }} />
-                    <Button type="text" icon={<EditOutlined className="text-blue-500" />} onClick={() => { setSelectedZone(r); form.setFieldsValue({ code: r.code, name: r.name, warehouseId: r.warehouseId, zoneType: r.zoneType }); setModalOpen(true); }} />
-                    <Button type="text" danger icon={<DeleteOutlined />} onClick={() => { if (window.confirm('Delete this zone?')) apiRequest(`/api/zones/${r.id}`, { method: 'DELETE' }, token).then(() => { message.success('Zone deleted'); fetchZones(); }).catch(e => message.error(e.message)); }} />
+                    <Button type="link" size="small" icon={<EyeOutlined />} className="text-blue-600 p-0 font-normal" onClick={() => { setSelectedZone(r); setViewMode(true); setModalOpen(true); form.setFieldsValue({ code: r.code, name: r.name, warehouseId: r.warehouseId, zoneType: r.zoneType }); }}>View</Button>
+                    <Button type="text" size="small" icon={<EditOutlined className="text-blue-600" />} onClick={() => { setSelectedZone(r); setViewMode(false); form.setFieldsValue({ code: r.code, name: r.name, warehouseId: r.warehouseId, zoneType: r.zoneType }); setModalOpen(true); }} />
+                    <Popconfirm title="Delete this zone?" onConfirm={() => handleDelete(r.id)} okText="Yes" cancelText="No">
+                        <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
                 </Space>
             )
         }
@@ -96,65 +123,113 @@ export default function Zones() {
             <div className="space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Zones</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Internal warehouse zoning and climate-controlled environment management</p>
+                        <h1 className="text-2xl font-medium text-blue-600">Warehouse Zones</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">Manage warehouse zones and specialized storage areas</p>
                     </div>
-                    <Button type="primary" icon={<PlusOutlined />} size="large" className="h-14 px-8 rounded-2xl bg-slate-900 border-slate-900 shadow-2xl shadow-slate-100 font-bold" onClick={() => { setSelectedZone(null); form.resetFields(); setModalOpen(true); }}>
-                        Establish Zone
+                    <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setSelectedZone(null); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
+                        + Add Zone
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Active Clusters</div><div className="text-3xl font-black">{zones.length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-blue-500 uppercase mb-1">Standard Storage</div><div className="text-3xl font-black">{zones.filter(z => z.zoneType === 'STANDARD').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-cyan-500 uppercase mb-1">Cold Chain</div><div className="text-3xl font-black">{zones.filter(z => z.zoneType === 'COLD').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-red-500 uppercase mb-1">Hazmat Critical</div><div className="text-3xl font-black">{zones.filter(z => z.zoneType === 'HAZMAT').length}</div></Card>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="text-xs text-gray-500 font-normal">Total Zones</div>
+                            <div className="text-2xl font-medium text-blue-600">{zones.length}</div>
+                        </div>
+                    </Card>
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="text-xs text-gray-500 font-normal">Standard</div>
+                            <div className="text-2xl font-medium text-blue-600">{zones.filter(z => z.zoneType === 'STANDARD').length}</div>
+                        </div>
+                    </Card>
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="text-xs text-gray-500 font-normal">Cold</div>
+                            <div className="text-2xl font-medium text-blue-600">{zones.filter(z => z.zoneType === 'COLD').length}</div>
+                        </div>
+                    </Card>
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="text-xs text-gray-500 font-normal">Frozen</div>
+                            <div className="text-2xl font-medium text-purple-600">{zones.filter(z => z.zoneType === 'FROZEN').length}</div>
+                        </div>
+                    </Card>
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="text-xs text-gray-500 font-normal">Hazmat</div>
+                            <div className="text-2xl font-medium text-red-600">{zones.filter(z => z.zoneType === 'HAZMAT').length}</div>
+                        </div>
+                    </Card>
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="text-xs text-gray-500 font-normal">Quarantine</div>
+                            <div className="text-2xl font-medium text-red-600">{zones.filter(z => z.zoneType === 'QUARANTINE').length}</div>
+                        </div>
+                    </Card>
                 </div>
 
-                <Card className="rounded-[2.5rem] shadow-sm border-gray-100 overflow-hidden">
-                    <div className="p-8">
-                        <div className="mb-8 flex items-center justify-between">
-                            <Search placeholder="Identity Search (Code, Name, Warehouse)..." className="max-w-md h-12 shadow-sm rounded-xl" prefix={<SearchOutlined />} />
-                            <Button icon={<ReloadOutlined />} onClick={fetchZones} />
+                <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
+                    <div className="p-6">
+                        <div className="mb-4 flex flex-wrap items-center gap-3">
+                            <Search placeholder="Search by zone name, code, or warehouse..." className="max-w-md" prefix={<SearchOutlined />} value={searchText} onChange={e => setSearchText(e.target.value)} allowClear />
+                            <Button icon={<SearchOutlined />} className="bg-blue-600 border-blue-600 text-white">Search</Button>
+                            <Button icon={<ReloadOutlined />} onClick={fetchZones}>Refresh</Button>
                         </div>
-                        <Table columns={columns} dataSource={zones} rowKey="id" loading={loading} />
+                        <Table
+                            columns={columns}
+                            dataSource={filteredZones}
+                            rowKey="id"
+                            loading={loading}
+                            pagination={{ showSizeChanger: true, showTotal: (t) => `Total ${t} zones`, pageSize: 10 }}
+                            scroll={{ x: 900 }}
+                            className="[&_.ant-table-thead_th]:font-normal"
+                        />
                     </div>
                 </Card>
 
-                <Modal title={selectedZone ? 'Edit Zone' : 'Add Zone'} open={modalOpen} onCancel={() => { setModalOpen(false); setSelectedZone(null); }} onOk={() => form.submit()} okButtonProps={{ loading: saving }} width={600} className="node-modal">
-                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-6">
-                        <Form.Item label="Zone Code" name="code" rules={[{ required: true }]}><Input placeholder="e.g. ZN-A" className="h-11 rounded-xl" disabled={!!selectedZone} /></Form.Item>
-                        <Form.Item label="Zone Name" name="name" rules={[{ required: true }]}><Input placeholder="Zone name" className="h-11 rounded-xl" /></Form.Item>
-                        <Form.Item label="Warehouse" name="warehouseId" rules={[{ required: true, message: 'Select warehouse' }]}>
-                            <Select placeholder="Select warehouse" className="h-11 rounded-xl" disabled={!!selectedZone}>
-                                {(Array.isArray(warehouses) ? warehouses : []).map(wh => <Option key={wh.id} value={wh.id}>{wh.name} ({wh.code})</Option>)}
-                            </Select>
-                        </Form.Item>
-                        <Form.Item label="Zone Type" name="zoneType">
-                            <Select placeholder="Select zone type" className="h-11 rounded-xl" allowClear>
-                                <Option value="STANDARD">Standard</Option>
-                                <Option value="COLD">Cold</Option>
-                                <Option value="FROZEN">Frozen</Option>
-                                <Option value="HAZMAT">Hazmat</Option>
-                                <Option value="QUARANTINE">Quarantine</Option>
-                            </Select>
-                        </Form.Item>
-                    </Form>
-                </Modal>
-
-                <Drawer title={`Spatial Audit: ${selectedZone?.name}`} width={500} open={detailOpen} onClose={() => setDetailOpen(false)} className="rounded-l-3xl">
-                    {selectedZone && (
-                        <div className="space-y-6">
-                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                                <Title level={5} className="uppercase text-[10px] tracking-widest text-slate-400 mb-4">Functional Capacity</Title>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><div className="text-xs text-gray-400">Total Nodes</div><div className="text-xl font-black">{selectedZone.locations?.length || 0}</div></div>
-                                    <div><div className="text-xs text-gray-400">Utilization</div><div className="text-xl font-black text-blue-600">84%</div></div>
-                                </div>
-                            </div>
+                <Modal
+                    title={viewMode ? 'View Zone' : selectedZone ? 'Edit Zone' : 'Add Zone'}
+                    open={modalOpen}
+                    onCancel={() => { setModalOpen(false); setSelectedZone(null); setViewMode(false); }}
+                    onOk={viewMode ? undefined : () => form.submit()}
+                    okButtonProps={{ className: 'bg-blue-600 border-blue-600', loading: saving }}
+                    footer={viewMode ? [<Button key="close" onClick={() => { setModalOpen(false); setViewMode(false); setSelectedZone(null); }}>Close</Button>] : undefined}
+                    width={560}
+                >
+                    {viewMode && selectedZone ? (
+                        <div className="pt-2 space-y-4">
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Zone Code</div><div className="text-gray-900">{selectedZone.code ?? '—'}</div></div>
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Zone Name</div><div className="text-gray-900">{selectedZone.name ?? '—'}</div></div>
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Warehouse</div><div className="text-gray-900">{selectedZone.Warehouse ? `${selectedZone.Warehouse.name} (${selectedZone.Warehouse.code})` : '—'}</div></div>
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Zone Type</div><div className="text-gray-900">{selectedZone.zoneType ? (ZONE_TYPE_LABELS[selectedZone.zoneType] || selectedZone.zoneType) : '—'}</div></div>
                         </div>
+                    ) : (
+                        <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-4">
+                            <Form.Item label="Zone Code" name="code" rules={[{ required: true, message: 'Required' }]}>
+                                <Input placeholder="e.g. ZN-A" className="rounded-lg" disabled={!!selectedZone} />
+                            </Form.Item>
+                            <Form.Item label="Zone Name" name="name" rules={[{ required: true, message: 'Required' }]}>
+                                <Input placeholder="Zone name" className="rounded-lg" />
+                            </Form.Item>
+                            <Form.Item label="Warehouse" name="warehouseId" rules={[{ required: true, message: 'Select warehouse' }]}>
+                                <Select placeholder="Select warehouse" className="rounded-lg" disabled={!!selectedZone}>
+                                    {(Array.isArray(warehouses) ? warehouses : []).map(wh => <Option key={wh.id} value={wh.id}>{wh.name} ({wh.code})</Option>)}
+                                </Select>
+                            </Form.Item>
+                            <Form.Item label="Zone Type" name="zoneType">
+                                <Select placeholder="Select zone type" className="rounded-lg" allowClear>
+                                    <Option value="STANDARD">Standard</Option>
+                                    <Option value="COLD">Cold</Option>
+                                    <Option value="FROZEN">Frozen</Option>
+                                    <Option value="HAZMAT">Hazmat</Option>
+                                    <Option value="QUARANTINE">Quarantine</Option>
+                                </Select>
+                            </Form.Item>
+                        </Form>
                     )}
-                </Drawer>
+                </Modal>
             </div>
         </MainLayout>
     );

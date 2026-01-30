@@ -24,9 +24,13 @@ const WarehouseZones = lazy(() => import('./pages/warehouses/Zones'));
 const WarehouseLocations = lazy(() => import('./pages/warehouses/Locations'));
 const InventoryAdjustments = lazy(() => import('./pages/inventory/Adjustments'));
 const InventoryCycleCounts = lazy(() => import('./pages/inventory/CycleCounts'));
+const InventoryBatches = lazy(() => import('./pages/inventory/Batches'));
 const InventoryMovements = lazy(() => import('./pages/inventory/Movements'));
+const InventoryByBestBeforeDate = lazy(() => import('./pages/inventory/ByBestBeforeDate'));
+const InventoryByLocation = lazy(() => import('./pages/inventory/ByLocation'));
 const ProductCategories = lazy(() => import('./pages/products/Categories'));
 const ProductBundles = lazy(() => import('./pages/products/Bundles'));
+const ImportExportProducts = lazy(() => import('./pages/products/ImportExportProducts'));
 const AddProduct = lazy(() => import('./pages/products/AddProduct'));
 const EditProduct = lazy(() => import('./pages/products/EditProduct'));
 const ViewProduct = lazy(() => import('./pages/products/ViewProduct'));
@@ -182,14 +186,8 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
-                <Route
-                    path="/inventory"
-                    element={
-                        <ProtectedRoute>
-                            <Inventory />
-                        </ProtectedRoute>
-                    }
-                />
+                <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+                <Route path="/inventoryProduct" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
                 <Route path="/sales-orders/new" element={<ProtectedRoute><CreateSalesOrder /></ProtectedRoute>} />
                 <Route path="/sales-orders/:id/edit" element={<ProtectedRoute><EditSalesOrder /></ProtectedRoute>} />
                 <Route path="/sales-orders/:id" element={<ProtectedRoute><ViewSalesOrder /></ProtectedRoute>} />
@@ -285,9 +283,13 @@ function App() {
                 <Route path="/warehouses/locations" element={<ProtectedRoute><WarehouseLocations /></ProtectedRoute>} />
                 <Route path="/products/categories" element={<ProtectedRoute><ProductCategories /></ProtectedRoute>} />
                 <Route path="/products/bundles" element={<ProtectedRoute><ProductBundles /></ProtectedRoute>} />
+                <Route path="/products/import-export" element={<ProtectedRoute><ImportExportProducts /></ProtectedRoute>} />
                 <Route path="/inventory/adjustments" element={<ProtectedRoute><InventoryAdjustments /></ProtectedRoute>} />
                 <Route path="/inventory/cycle-counts" element={<ProtectedRoute><InventoryCycleCounts /></ProtectedRoute>} />
+                <Route path="/inventory/batches" element={<ProtectedRoute><InventoryBatches /></ProtectedRoute>} />
                 <Route path="/inventory/movements" element={<ProtectedRoute><InventoryMovements /></ProtectedRoute>} />
+                <Route path="/inventory/by-best-before-date" element={<ProtectedRoute><InventoryByBestBeforeDate /></ProtectedRoute>} />
+                <Route path="/inventory/by-location" element={<ProtectedRoute><InventoryByLocation /></ProtectedRoute>} />
                 <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
                 <Route path="/settings/marketplace-api" element={<ProtectedRoute><MarketplaceApi /></ProtectedRoute>} />
                 <Route path="/analytics/pricing-calculator" element={<ProtectedRoute><AnalyticsPricing /></ProtectedRoute>} />

@@ -35,6 +35,8 @@ const Product = sequelize.define('Product', {
   supplierId: { type: DataTypes.INTEGER, allowNull: true },
   cartons: { type: DataTypes.JSON, allowNull: true },
   priceLists: { type: DataTypes.JSON, allowNull: true },
+  supplierProducts: { type: DataTypes.JSON, allowNull: true },
+  alternativeSkus: { type: DataTypes.JSON, allowNull: true },
 }, {
   tableName: 'products',
   timestamps: true,

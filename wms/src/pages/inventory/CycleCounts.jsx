@@ -1,113 +1,353 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Input, Card, Modal, Form, message, Tag, Tabs, Select, Typography, Badge, Space } from 'antd';
-import { PlusOutlined, SearchOutlined, EyeOutlined, InboxOutlined, CheckCircleOutlined, ClockCircleOutlined, WarningOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Card, Modal, Form, message, Tag, Tabs, Select, DatePicker } from 'antd';
+import { PlusOutlined, SearchOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { useAuthStore } from '../../store/authStore';
 import { apiRequest } from '../../api/client';
-import { mockCycleCounts } from '../../mockData';
 import { formatDate } from '../../utils';
 
 const { Search } = Input;
-const { Title } = Typography;
-const { Option } = Select;
+
+const COUNT_TYPES = [
+  { value: 'FULL', label: 'Full Count' },
+  { value: 'PARTIAL', label: 'Partial' },
+  { value: 'SPOT', label: 'Spot Check' },
+];
 
 export default function CycleCounts() {
-    const { token } = useAuthStore();
-    const [loading, setLoading] = useState(false);
-    const [cycleCounts, setCycleCounts] = useState([]);
-    const [locations, setLocations] = useState([]);
-    const [modalOpen, setModalOpen] = useState(false);
-    const [form] = Form.useForm();
+  const { token } = useAuthStore();
+  const [loading, setLoading] = useState(false);
+  const [cycleCounts, setCycleCounts] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [viewingCount, setViewingCount] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  const [form] = Form.useForm();
 
-    const fetchCycleCounts = useCallback(async () => {
-        setLoading(true);
-        setCycleCounts(mockCycleCounts);
-        setLoading(false);
-    }, []);
+  const fetchCycleCounts = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (['COMPLETED', 'IN_PROGRESS', 'PENDING'].includes(activeTab)) params.set('status', activeTab);
+      if (searchText) params.set('search', searchText);
+      const res = await apiRequest(`/api/inventory/cycle-counts?${params.toString()}`, { method: 'GET' }, token);
+      setCycleCounts(Array.isArray(res?.data) ? res.data : []);
+    } catch (err) {
+      setCycleCounts([]);
+      message.error(err?.message || 'Failed to load cycle counts.');
+    } finally {
+      setLoading(false);
+    }
+  }, [token, activeTab, searchText]);
 
-    const fetchLocations = useCallback(async () => {
-        if (!token) return;
-        try {
-            const data = await apiRequest('/api/locations', { method: 'GET' }, token);
-            setLocations(Array.isArray(data.data) ? data.data : []);
-        } catch (_) {
-            setLocations([]);
-        }
-    }, [token]);
+  const fetchLocations = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await apiRequest('/api/locations', { method: 'GET' }, token);
+      setLocations(Array.isArray(res?.data) ? res.data : []);
+    } catch (_) {
+      setLocations([]);
+    }
+  }, [token]);
 
-    useEffect(() => {
-        if (token) {
-            fetchCycleCounts();
-            fetchLocations();
-        }
-    }, [token, fetchCycleCounts, fetchLocations]);
+  useEffect(() => {
+    if (token) {
+      fetchLocations();
+    }
+  }, [token, fetchLocations]);
 
-    const handleSubmit = async (values) => {
-        try {
-            message.success('Inventory audit mission initialized.');
-            setModalOpen(false);
-            fetchCycleCounts();
-        } catch (err) {
-            message.error('Audit initiation failed');
-        }
-    };
+  useEffect(() => {
+    if (token) fetchCycleCounts();
+  }, [token, fetchCycleCounts]);
 
-    const columns = [
-        { title: 'Audit ID', dataIndex: 'referenceNumber', key: 'ref', render: (v, r) => <span className="font-mono text-[10px] font-black">{v || `CC-${r.id.slice(0, 8)}`}</span> },
-        { title: 'Schedule', dataIndex: 'scheduledDate', key: 'date', render: (v) => <span className="text-gray-400 font-medium">{formatDate(v)}</span> },
-        { title: 'Target Node', key: 'loc', render: (_, r) => r.location ? `${r.location.aisle}-${r.location.rack}-${r.location.bin}` : 'Global' },
-        { title: 'Asset Count', dataIndex: 'itemsCount', key: 'cnt', render: (v) => <Badge count={v || 0} showZero color="#6366f1" /> },
-        { title: 'Discrepancy', dataIndex: 'discrepancies', key: 'disc', render: (v) => <Tag color={v > 0 ? 'red' : 'green'} className="font-black border-none">{v || 0} DELTA</Tag> },
-        { title: 'State', dataIndex: 'status', key: 'status', render: (v) => <Tag color={v === 'COMPLETED' ? 'green' : 'blue'} className="font-heavy uppercase">{v}</Tag> },
-        { title: 'Auditor', key: 'user', render: (_, r) => r.countedBy?.name || 'System' }
-    ];
+  const handleSubmit = async (values) => {
+    try {
+      await apiRequest('/api/inventory/cycle-counts', {
+        method: 'POST',
+        body: JSON.stringify({
+          countName: values.countName,
+          countType: values.countType,
+          locationId: values.locationId || undefined,
+          scheduledDate: values.scheduledDate ? dayjs(values.scheduledDate).format('YYYY-MM-DD') : undefined,
+          notes: values.notes || undefined,
+        }),
+      }, token);
+      message.success('Cycle count created.');
+      form.resetFields();
+      setModalOpen(false);
+      fetchCycleCounts();
+    } catch (err) {
+      message.error(err?.message || err?.data?.message || 'Failed to create cycle count.');
+    }
+  };
 
-    return (
-        <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Cycle Counts</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Periodic inventory verification missions and coordinate-level stock audits</p>
-                    </div>
-                    <Button type="primary" icon={<PlusOutlined />} size="large" className="h-14 px-8 rounded-2xl bg-indigo-600 border-indigo-600 shadow-2xl shadow-indigo-100 font-bold" onClick={() => { form.resetFields(); setModalOpen(true); }}>
-                        Initialize Audit
-                    </Button>
+  const locationLabel = (loc) => {
+    if (!loc) return '—';
+    if (loc.code) return loc.code;
+    const parts = [loc.aisle, loc.rack, loc.shelf, loc.bin].filter(Boolean);
+    return parts.length ? parts.join('-') : loc.name || '—';
+  };
+
+  const columns = [
+    {
+      title: 'Count ID',
+      dataIndex: 'referenceNumber',
+      key: 'ref',
+      width: 120,
+      render: (v, r) => (
+        <span className="font-medium text-blue-600">
+          {v || `CC-${String(r.id || '').padStart(5, '0')}`}
+        </span>
+      ),
+    },
+    {
+      title: 'Date',
+      dataIndex: 'scheduledDate',
+      key: 'date',
+      width: 120,
+      render: (v, r) => formatDate(v || r.createdAt),
+    },
+    {
+      title: 'Location',
+      key: 'loc',
+      width: 140,
+      render: (_, r) => locationLabel(r.Location),
+    },
+    {
+      title: 'Items Counted',
+      dataIndex: 'itemsCount',
+      key: 'cnt',
+      width: 120,
+      align: 'right',
+      render: (v) => v ?? 0,
+    },
+    {
+      title: 'Discrepancies',
+      dataIndex: 'discrepancies',
+      key: 'disc',
+      width: 120,
+      align: 'right',
+      render: (v) => (v > 0 ? <Tag color="red">{v}</Tag> : v ?? 0),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (v) => {
+        if (v === 'COMPLETED') return <Tag color="green">Completed</Tag>;
+        if (v === 'IN_PROGRESS') return <Tag color="blue">In Progress</Tag>;
+        return <Tag color="orange">Pending</Tag>;
+      },
+    },
+    {
+      title: 'Counter',
+      key: 'user',
+      width: 120,
+      render: (_, r) => r.countedBy?.name ?? '—',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 80,
+      render: (_, r) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<EyeOutlined />}
+          className="text-blue-600 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            setViewingCount(r);
+          }}
+        >
+          View
+        </Button>
+      ),
+    },
+  ];
+
+  const withDiscrepancies = cycleCounts.filter((c) => (c.discrepancies || 0) > 0);
+
+  return (
+    <MainLayout>
+      <div className="space-y-6 animate-in fade-in duration-500 pb-12">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-medium text-blue-600">Cycle Counts</h1>
+            <p className="text-gray-500 text-sm mt-0.5">Track inventory cycle counting operations.</p>
+          </div>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            className="bg-blue-600 border-blue-600 rounded-lg"
+            onClick={() => {
+              form.resetFields();
+              setModalOpen(true);
+            }}
+          >
+            Start Count
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="rounded-xl shadow-sm border-gray-100">
+            <div className="text-gray-500 text-sm font-normal">Total Counts</div>
+            <div className="text-xl font-medium text-blue-600">{cycleCounts.length}</div>
+          </Card>
+          <Card className="rounded-xl shadow-sm border-gray-100">
+            <div className="text-gray-500 text-sm font-normal">Completed</div>
+            <div className="text-xl font-medium text-green-600">{cycleCounts.filter((c) => c.status === 'COMPLETED').length}</div>
+          </Card>
+          <Card className="rounded-xl shadow-sm border-gray-100">
+            <div className="text-gray-500 text-sm font-normal">In Progress</div>
+            <div className="text-xl font-medium text-orange-600">{cycleCounts.filter((c) => c.status === 'IN_PROGRESS').length}</div>
+          </Card>
+          <Card className="rounded-xl shadow-sm border-gray-100">
+            <div className="text-gray-500 text-sm font-normal">Discrepancies</div>
+            <div className="text-xl font-medium text-red-600">{withDiscrepancies.length}</div>
+          </Card>
+        </div>
+
+        <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            className="[&_.ant-tabs-nav]:mb-4"
+            items={[
+              { key: 'all', label: `All Counts (${cycleCounts.length})` },
+              { key: 'COMPLETED', label: `Completed (${cycleCounts.filter((c) => c.status === 'COMPLETED').length})` },
+              { key: 'IN_PROGRESS', label: `In Progress (${cycleCounts.filter((c) => c.status === 'IN_PROGRESS').length})` },
+              { key: 'PENDING', label: `Pending (${cycleCounts.filter((c) => c.status === 'PENDING').length})` },
+              { key: 'discrepancies', label: `With Discrepancies (${withDiscrepancies.length})` },
+            ]}
+          />
+          <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
+            <Search
+              placeholder="Search cycle counts..."
+              allowClear
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onSearch={() => fetchCycleCounts()}
+              className="max-w-xs rounded-lg"
+              prefix={<SearchOutlined className="text-gray-400" />}
+            />
+            <Button icon={<ReloadOutlined />} onClick={fetchCycleCounts} loading={loading} className="rounded-lg">
+              Refresh
+            </Button>
+          </div>
+          <Table
+            columns={columns}
+            dataSource={activeTab === 'discrepancies' ? withDiscrepancies : cycleCounts}
+            rowKey="id"
+            loading={loading}
+            pagination={{ showSizeChanger: true, showTotal: (t) => `Total ${t} cycle counts`, pageSize: 10 }}
+            className="[&_.ant-table-thead_th]:font-normal"
+            scroll={{ x: 900 }}
+          />
+        </Card>
+
+        <Modal
+          title="View Cycle Count"
+          open={!!viewingCount}
+          onCancel={() => setViewingCount(null)}
+          footer={
+            <Button type="primary" className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => setViewingCount(null)}>
+              Close
+            </Button>
+          }
+          width={520}
+          className="rounded-xl"
+        >
+          {viewingCount && (
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="text-gray-500">Count ID</div>
+                <div className="font-medium">{viewingCount.referenceNumber || `CC-${String(viewingCount.id || '').padStart(5, '0')}`}</div>
+                <div className="text-gray-500">Count Name</div>
+                <div>{viewingCount.countName ?? '—'}</div>
+                <div className="text-gray-500">Count Type</div>
+                <div>{viewingCount.countType ?? '—'}</div>
+                <div className="text-gray-500">Location</div>
+                <div>{locationLabel(viewingCount.Location)}</div>
+                <div className="text-gray-500">Scheduled Date</div>
+                <div>{formatDate(viewingCount.scheduledDate) ?? '—'}</div>
+                <div className="text-gray-500">Items Counted</div>
+                <div>{viewingCount.itemsCount ?? 0}</div>
+                <div className="text-gray-500">Discrepancies</div>
+                <div>{viewingCount.discrepancies ?? 0}</div>
+                <div className="text-gray-500">Status</div>
+                <div>
+                  {viewingCount.status === 'COMPLETED' && <Tag color="green">Completed</Tag>}
+                  {viewingCount.status === 'IN_PROGRESS' && <Tag color="blue">In Progress</Tag>}
+                  {viewingCount.status === 'PENDING' && <Tag color="orange">Pending</Tag>}
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Missions</div><div className="text-3xl font-black">{cycleCounts.length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-green-500 uppercase mb-1">Verified Correct</div><div className="text-3xl font-black">{cycleCounts.filter(c => c.status === 'COMPLETED' && !c.discrepancies).length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-red-500 uppercase mb-1">Delta Detected</div><div className="text-3xl font-black">{cycleCounts.filter(c => (c.discrepancies || 0) > 0).length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-indigo-500 uppercase mb-1">Active Now</div><div className="text-3xl font-black">{cycleCounts.filter(c => c.status === 'IN_PROGRESS').length}</div></Card>
-                </div>
-
-                <Card className="rounded-[2.5rem] shadow-sm border-gray-100 overflow-hidden">
-                    <div className="p-8">
-                        <div className="mb-8 flex items-center justify-between">
-                            <Search placeholder="Audit Mission Search (Reference, Node, Counter)..." className="max-w-md h-12 shadow-sm rounded-xl" prefix={<SearchOutlined />} />
-                            <Button icon={<ReloadOutlined />} onClick={fetchCycleCounts} />
-                        </div>
-                        <Table columns={columns} dataSource={cycleCounts} rowKey="id" loading={loading} />
-                    </div>
-                </Card>
-
-                <Modal title="Initialize Asset Verification Mission" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} width={600} className="cc-modal">
-                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-6">
-                        <Form.Item label="Mission Code-Name" name="name" rules={[{ required: true }]}><Input placeholder="Weekly Zone-B Reconciliation" className="h-11 rounded-xl" /></Form.Item>
-                        <div className="grid grid-cols-2 gap-4">
-                            <Form.Item label="Audit Methodology" name="type" initialValue="FULL"><Select className="h-11 rounded-xl"><Option value="FULL">Total System Audit</Option><Option value="PARTIAL">Sample Verification</Option><Option value="SPOT">Spot Check</Option></Select></Form.Item>
-                            <Form.Item label="Target Coordinate" name="locationId" rules={[{ required: true }]}>
-                                <Select showSearch placeholder="Search Nodes" className="h-11 rounded-xl">
-                                    {locations.map(l => <Option key={l.id} value={l.id}>{l.name} ({l.aisle}-{l.rack})</Option>)}
-                                </Select>
-                            </Form.Item>
-                        </div>
-                        <Form.Item label="Temporal Window (Schedule Date)" name="scheduledDate" rules={[{ required: true }]}><Input type="date" className="h-11 rounded-xl" /></Form.Item>
-                        <Form.Item label="Operational Directives" name="notes"><Input.TextArea rows={3} className="rounded-xl" /></Form.Item>
-                    </Form>
-                </Modal>
+                <div className="text-gray-500">Counter</div>
+                <div>{viewingCount.countedBy?.name ?? '—'}</div>
+              </div>
+              {viewingCount.notes && (
+                <>
+                  <div className="text-gray-500 text-sm">Notes</div>
+                  <div className="text-sm bg-gray-50 rounded-lg p-3">{viewingCount.notes}</div>
+                </>
+              )}
             </div>
-        </MainLayout>
-    );
+          )}
+        </Modal>
+
+        <Modal
+          title="Start Cycle Count"
+          open={modalOpen}
+          onCancel={() => setModalOpen(false)}
+          footer={null}
+          width={520}
+          className="rounded-xl"
+        >
+          <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-2">
+            <Form.Item
+              label="Count Name"
+              name="countName"
+              rules={[{ required: true, message: 'Enter count name' }]}
+            >
+              <Input placeholder="Count Name" className="rounded-lg" />
+            </Form.Item>
+            <Form.Item label="Count Type" name="countType">
+              <Select placeholder="Select count type" allowClear className="rounded-lg" options={COUNT_TYPES} />
+            </Form.Item>
+            <Form.Item label="Location" name="locationId">
+              <Select
+                showSearch
+                placeholder="Select a location to count"
+                allowClear
+                className="rounded-lg"
+                optionFilterProp="label"
+                filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                options={locations.map((l) => ({
+                  value: l.id,
+                  label: l.name ? `${l.name} (${l.aisle || ''}-${l.rack || ''})` : `${l.aisle || ''}-${l.rack || ''}-${l.shelf || ''}-${l.bin || ''}`.replace(/^-|-$/g, '') || `Location ${l.id}`,
+                }))}
+              />
+            </Form.Item>
+            <Form.Item label="Scheduled Date" name="scheduledDate">
+              <DatePicker format="MM/DD/YYYY" className="w-full rounded-lg" placeholder="mm/dd/yyyy" />
+            </Form.Item>
+            <Form.Item label="Notes (Optional)" name="notes">
+              <Input.TextArea rows={3} className="rounded-lg" placeholder="Notes (Optional)" />
+            </Form.Item>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button onClick={() => setModalOpen(false)} className="rounded-lg">
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit" className="bg-blue-600 border-blue-600 rounded-lg">
+                Create
+              </Button>
+            </div>
+          </Form>
+        </Modal>
+      </div>
+    </MainLayout>
+  );
 }

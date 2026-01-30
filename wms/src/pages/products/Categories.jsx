@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Input, Card, Modal, Form, Space, Tag, message, Typography, Select, Popconfirm } from 'antd';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Card, Modal, Form, Space, Tag, message, Select, Popconfirm } from 'antd';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ReloadOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { useAuthStore } from '../../store/authStore';
 import { apiRequest } from '../../api/client';
@@ -14,6 +14,7 @@ export default function Categories() {
     const [categories, setCategories] = useState([]);
     const [companies, setCompanies] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
+    const [viewMode, setViewMode] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [saving, setSaving] = useState(false);
     const [searchText, setSearchText] = useState('');
@@ -78,22 +79,33 @@ export default function Categories() {
             message.success('Category deleted');
             fetchCategories();
         } catch (err) {
-            message.error(err.message || 'Failed to delete');
+            message.error(err?.message || 'Failed to delete');
         }
     };
 
+    const filteredCategories = categories.filter(c => {
+        if (!searchText) return true;
+        const s = searchText.toLowerCase();
+        return (c.name || '').toLowerCase().includes(s) || (c.code || '').toLowerCase().includes(s);
+    });
+
+    const totalProducts = categories.reduce((s, c) => s + (c.productCount || 0), 0);
+
     const columns = [
-        { title: 'Code', dataIndex: 'code', key: 'code', render: (v) => <Tag color="purple" className="font-black border-none text-[10px] uppercase">{v || '—'}</Tag> },
-        { title: 'Name', dataIndex: 'name', key: 'name', render: (v) => <span className="font-bold text-slate-800">{v}</span> },
-        { title: 'Products', dataIndex: 'productCount', key: 'count', render: (v) => <Tag color={(v || 0) > 0 ? 'green' : 'default'} className="rounded-full">{(v || 0)} items</Tag> },
+        { title: 'Code', dataIndex: 'code', key: 'code', width: 140, render: (v) => <span className="font-medium text-blue-600">{v || '—'}</span> },
+        { title: 'Name', dataIndex: 'name', key: 'name', render: (v) => <span className="flex items-center gap-2"><AppstoreOutlined className="text-gray-400" />{v || '—'}</span> },
+        { title: 'Products', dataIndex: 'productCount', key: 'count', width: 120, render: (v) => <Tag color={(v || 0) > 0 ? 'green' : 'default'} className="rounded-full font-normal">{(v || 0)} items</Tag> },
         {
             title: 'Actions',
             key: 'act',
+            width: 140,
+            fixed: 'right',
             render: (_, r) => (
                 <Space>
-                    <Button type="text" icon={<EditOutlined className="text-purple-500" />} onClick={() => { setSelectedCategory(r); form.setFieldsValue({ name: r.name, code: r.code, companyId: r.companyId }); setModalOpen(true); }} />
-                    <Popconfirm title="Delete this category?" onConfirm={() => handleDelete(r.id)}>
-                        <Button type="text" danger icon={<DeleteOutlined />} />
+                    <Button type="link" size="small" icon={<EyeOutlined />} className="text-blue-600 p-0 font-normal" onClick={() => { setSelectedCategory(r); setViewMode(true); setModalOpen(true); form.setFieldsValue({ name: r.name, code: r.code, companyId: r.companyId }); }}>View</Button>
+                    <Button type="text" size="small" icon={<EditOutlined className="text-blue-600" />} onClick={() => { setSelectedCategory(r); setViewMode(false); form.setFieldsValue({ name: r.name, code: r.code, companyId: r.companyId }); setModalOpen(true); }} />
+                    <Popconfirm title="Delete this category?" onConfirm={() => handleDelete(r.id)} okText="Yes" cancelText="No">
+                        <Button type="text" size="small" danger icon={<DeleteOutlined />} />
                     </Popconfirm>
                 </Space>
             )
@@ -105,41 +117,85 @@ export default function Categories() {
             <div className="space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Categories</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Hierarchical classification and categorization of warehouse inventory</p>
+                        <h1 className="text-2xl font-medium text-blue-600">Categories</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">Hierarchical classification and categorization of warehouse inventory</p>
                     </div>
-                    <Button type="primary" icon={<PlusOutlined />} size="large" className="h-14 px-8 rounded-2xl bg-purple-600 border-purple-600 shadow-2xl shadow-purple-100 font-bold" onClick={() => { setSelectedCategory(null); form.resetFields(); setModalOpen(true); }}>
-                        Add Category
+                    <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setSelectedCategory(null); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
+                        + Add Category
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Taxon Groups</div><div className="text-3xl font-black">{categories.length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-purple-500 uppercase mb-1">Total Products</div><div className="text-3xl font-black">{categories.reduce((s, c) => s + (c.productCount || 0), 0)}</div></Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600"><AppstoreOutlined style={{ fontSize: 22 }} /></div>
+                            <div>
+                                <div className="text-xs text-gray-500 font-normal">Total Categories</div>
+                                <div className="text-2xl font-medium text-blue-600">{categories.length}</div>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="rounded-xl border-gray-100 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-600"><AppstoreOutlined style={{ fontSize: 22 }} /></div>
+                            <div>
+                                <div className="text-xs text-gray-500 font-normal">Total Products</div>
+                                <div className="text-2xl font-medium text-green-600">{totalProducts}</div>
+                            </div>
+                        </div>
+                    </Card>
                 </div>
 
-                <Card className="rounded-[2.5rem] shadow-sm border-gray-100 overflow-hidden">
-                    <div className="p-8">
-                        <div className="mb-8 flex items-center justify-between">
-                            <Search placeholder="Identity Search (Code, Namespace)..." className="max-w-md h-12 shadow-sm rounded-xl" prefix={<SearchOutlined />} />
-                            <Button icon={<ReloadOutlined />} onClick={fetchCategories} />
+                <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
+                    <div className="p-6">
+                        <div className="mb-4 flex flex-wrap items-center gap-3">
+                            <Search placeholder="Search by name or code..." className="max-w-md" prefix={<SearchOutlined />} value={searchText} onChange={e => setSearchText(e.target.value)} allowClear />
+                            <Button icon={<SearchOutlined />} className="bg-blue-600 border-blue-600 text-white">Search</Button>
+                            <Button icon={<ReloadOutlined />} onClick={fetchCategories}>Refresh</Button>
                         </div>
-                        <Table columns={columns} dataSource={categories} rowKey="id" loading={loading} />
+                        <Table
+                            columns={columns}
+                            dataSource={filteredCategories}
+                            rowKey="id"
+                            loading={loading}
+                            pagination={{ showSizeChanger: true, showTotal: (t) => `Total ${t} categories`, pageSize: 10 }}
+                            className="[&_.ant-table-thead_th]:font-normal"
+                        />
                     </div>
                 </Card>
 
-                <Modal title={selectedCategory ? 'Edit Category' : 'Add Category'} open={modalOpen} onCancel={() => { setModalOpen(false); setSelectedCategory(null); }} onOk={() => form.submit()} okButtonProps={{ loading: saving }} width={500} className="cat-modal">
-                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-6">
-                        {isSuperAdmin && !selectedCategory && (
-                            <Form.Item label="Company" name="companyId" rules={[{ required: true, message: 'Select company' }]}>
-                                <Select placeholder="Select company" className="h-11 rounded-xl">
-                                    {(Array.isArray(companies) ? companies : []).map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
-                                </Select>
+                <Modal
+                    title={viewMode ? 'View Category' : selectedCategory ? 'Edit Category' : 'Add Category'}
+                    open={modalOpen}
+                    onCancel={() => { setModalOpen(false); setSelectedCategory(null); setViewMode(false); }}
+                    onOk={viewMode ? undefined : () => form.submit()}
+                    okButtonProps={{ className: 'bg-blue-600 border-blue-600', loading: saving }}
+                    footer={viewMode ? [<Button key="close" onClick={() => { setModalOpen(false); setViewMode(false); setSelectedCategory(null); }}>Close</Button>] : undefined}
+                    width={520}
+                >
+                    {viewMode && selectedCategory ? (
+                        <div className="pt-2 space-y-4">
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Category Name</div><div className="text-gray-900">{selectedCategory.name ?? '—'}</div></div>
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Code</div><div className="text-gray-900">{selectedCategory.code ?? '—'}</div></div>
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Products</div><div className="text-gray-900">{selectedCategory.productCount != null ? selectedCategory.productCount : '—'}</div></div>
+                        </div>
+                    ) : (
+                        <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-4">
+                            {isSuperAdmin && !selectedCategory && (
+                                <Form.Item label="Company" name="companyId" rules={[{ required: true, message: 'Select company' }]}>
+                                    <Select placeholder="Select company" className="rounded-lg">
+                                        {(Array.isArray(companies) ? companies : []).map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+                                    </Select>
+                                </Form.Item>
+                            )}
+                            <Form.Item label="Category Name" name="name" rules={[{ required: true, message: 'Required' }]}>
+                                <Input placeholder="e.g. Electronics" className="rounded-lg" />
                             </Form.Item>
-                        )}
-                        <Form.Item label="Category Name" name="name" rules={[{ required: true }]}><Input placeholder="e.g. Electronics" className="h-11 rounded-xl" /></Form.Item>
-                        <Form.Item label="Code" name="code"><Input placeholder="Optional - auto from name if empty" className="h-11 rounded-xl" /></Form.Item>
-                    </Form>
+                            <Form.Item label="Code" name="code">
+                                <Input placeholder="Optional - auto from name if empty" className="rounded-lg" />
+                            </Form.Item>
+                        </Form>
+                    )}
                 </Modal>
             </div>
         </MainLayout>

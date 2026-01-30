@@ -60,6 +60,7 @@ async function create(data, reqUser) {
     companyId,
     sku: (data.sku || '').trim(),
     name: data.name,
+    description: data.description || null,
     costPrice: data.costPrice ?? 0,
     sellingPrice: data.sellingPrice ?? 0,
     status: data.status || 'ACTIVE',
@@ -78,6 +79,7 @@ async function update(id, data, reqUser) {
   await bundle.update({
     name: data.name ?? bundle.name,
     sku: data.sku !== undefined ? data.sku.trim() : bundle.sku,
+    description: data.description !== undefined ? data.description : bundle.description,
     costPrice: data.costPrice !== undefined ? data.costPrice : bundle.costPrice,
     sellingPrice: data.sellingPrice !== undefined ? data.sellingPrice : bundle.sellingPrice,
     status: data.status ?? bundle.status,

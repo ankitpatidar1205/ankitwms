@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Card, Modal, Form, DatePicker, InputNumber, message, Tabs, Popconfirm, Drawer, List, Empty, Divider, Typography } from 'antd';
+import { Table, Button, Input, Select, Tag, Space, Card, Modal, Form, DatePicker, InputNumber, message, Tabs, Popconfirm, Drawer, List, Divider } from 'antd';
 import {
     PlusOutlined,
     SearchOutlined,
@@ -7,26 +7,18 @@ import {
     EyeOutlined,
     EditOutlined,
     DeleteOutlined,
-    CheckCircleOutlined,
-    CloseCircleOutlined,
-    FileTextOutlined,
-    ClockCircleOutlined,
-    CheckOutlined,
-    InboxOutlined,
     ReloadOutlined,
     ShoppingCartOutlined,
     MinusCircleOutlined,
     PrinterOutlined,
 } from '@ant-design/icons';
-import { formatCurrency, formatDate, getStatusColor } from '../../utils';
+import { formatCurrency, formatDate } from '../../utils';
 import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { apiRequest } from '../../api/client';
 import dayjs from 'dayjs';
 
 const { Search } = Input;
-const { Option } = Select;
-const { Text } = Typography;
 
 export default function PurchaseOrders() {
     const { token } = useAuthStore();
@@ -40,8 +32,93 @@ export default function PurchaseOrders() {
     const [selectedPO, setSelectedPO] = useState(null);
     const [selectedItems, setSelectedItems] = useState([]);
     const [activeTab, setActiveTab] = useState('all');
+    const [searchText, setSearchText] = useState('');
+    const [supplierFilter, setSupplierFilter] = useState(undefined);
+    const [printPO, setPrintPO] = useState(null);
     const [form] = Form.useForm();
     const [editForm] = Form.useForm();
+
+    useEffect(() => {
+        if (!printPO) return;
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            message.warning('Allow popups to print.');
+            setPrintPO(null);
+            return;
+        }
+        const items = (printPO.items || [])
+            .map(
+                (item) =>
+                    `<tr>
+                        <td style="border:1px solid #999;padding:8px 12px">${(item.productName ?? '—').replace(/</g, '&lt;')}</td>
+                        <td style="border:1px solid #999;padding:8px 12px">${(item.productSku ?? '—').replace(/</g, '&lt;')}</td>
+                        <td style="border:1px solid #999;padding:8px 12px;text-align:right">${item.quantity ?? 0}</td>
+                        <td style="border:1px solid #999;padding:8px 12px;text-align:right">${formatCurrency(item.unitPrice ?? 0)}</td>
+                        <td style="border:1px solid #999;padding:8px 12px;text-align:right">${formatCurrency(item.totalPrice ?? 0)}</td>
+                    </tr>`
+            )
+            .join('');
+        const notesHtml = printPO.notes
+            ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #ccc"><div style="font-size:12px;color:#666">Notes</div><div style="font-size:14px">${String(printPO.notes).replace(/</g, '&lt;')}</div></div>`
+            : '';
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"><title>PO ${(printPO.poNumber || '').replace(/</g, '&lt;')}</title>
+            <style>body{font-family:sans-serif;padding:20px;max-width:210mm;margin:0 auto;font-size:14px;}</style>
+            </head>
+            <body>
+                <h1 style="font-size:20px;font-weight:bold;margin-bottom:8px;color:#111">Purchase Order</h1>
+                <div style="border-bottom:1px solid #ccc;padding-bottom:12px;margin-bottom:12px;display:flex;justify-content:space-between">
+                    <div>
+                        <div style="font-size:12px;color:#666">PO Number</div>
+                        <div style="font-weight:600;font-size:18px">${(printPO.poNumber || '').replace(/</g, '&lt;')}</div>
+                    </div>
+                    <div style="text-align:right">
+                        <div style="font-size:12px;color:#666">Order Date</div>
+                        <div>${formatDate(printPO.orderDate)}</div>
+                    </div>
+                </div>
+                <div style="margin-bottom:16px">
+                    <div style="font-size:12px;color:#666">Supplier</div>
+                    <div style="font-weight:500">${(printPO.supplier || '').replace(/</g, '&lt;')}</div>
+                </div>
+                <div style="margin-bottom:16px;font-size:14px;color:#666">Expected Delivery: ${formatDate(printPO.expectedDelivery) ?? '—'}</div>
+                <table style="width:100%;border-collapse:collapse;border:1px solid #999;margin-top:16px">
+                    <thead>
+                        <tr style="background:#f0f0f0">
+                            <th style="border:1px solid #999;padding:8px 12px;text-align:left">Product</th>
+                            <th style="border:1px solid #999;padding:8px 12px;text-align:left">SKU</th>
+                            <th style="border:1px solid #999;padding:8px 12px;text-align:right">Qty</th>
+                            <th style="border:1px solid #999;padding:8px 12px;text-align:right">Unit Price</th>
+                            <th style="border:1px solid #999;padding:8px 12px;text-align:right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>${items}</tbody>
+                </table>
+                <div style="margin-top:16px;display:flex;justify-content:flex-end"><span style="font-weight:bold">Total: ${formatCurrency(printPO.totalAmount ?? 0)}</span></div>
+                ${notesHtml}
+                <div style="margin-top:24px;font-size:12px;color:#888">Kiaan WMS — Printed on ${formatDate(new Date())}</div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        const timer = setTimeout(() => {
+            printWindow.print();
+            printWindow.onafterprint = () => printWindow.close();
+            setPrintPO(null);
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [printPO]);
+
+    const poStatusColor = (s) => {
+        const t = (s || '').toUpperCase();
+        if (t === 'PENDING' || t === 'DRAFT') return 'orange';
+        if (t === 'APPROVED') return 'green';
+        if (t === 'RECEIVED' || t === 'COMPLETED') return 'green';
+        return 'default';
+    };
 
     const fetchPurchaseOrders = useCallback(async () => {
         if (!token) { setLoading(false); return; }
@@ -58,7 +135,7 @@ export default function PurchaseOrders() {
                 poNumber: po.poNumber,
                 supplier: po.Supplier?.name || po.supplierName || '-',
                 supplierId: po.supplierId,
-                status: (po.status || 'pending').toLowerCase(),
+                status: (po.status || 'pending').toUpperCase(),
                 totalAmount: Number(po.totalAmount) || 0,
                 orderDate: po.createdAt || po.expectedDelivery,
                 expectedDelivery: po.expectedDelivery,
@@ -87,6 +164,8 @@ export default function PurchaseOrders() {
         fetchPurchaseOrders();
     }, [fetchPurchaseOrders]);
 
+    const [productSelectValue, setProductSelectValue] = useState(undefined);
+
     const addItem = (product) => {
         const existingItem = selectedItems.find(item => item.productId === product.id);
         if (existingItem) {
@@ -107,6 +186,7 @@ export default function PurchaseOrders() {
                 isBundle: product.type === 'BUNDLE',
             }]);
         }
+        setProductSelectValue(undefined);
     };
 
     const removeItem = (productId) => {
@@ -137,7 +217,7 @@ export default function PurchaseOrders() {
         try {
             const payload = {
                 supplierId: Number(values.supplierId),
-                expectedDelivery: values.expectedDelivery ? (values.expectedDelivery.toISOString?.() || values.expectedDelivery) : undefined,
+                expectedDelivery: values.expectedDelivery ? dayjs(values.expectedDelivery).format('YYYY-MM-DD') : undefined,
                 notes: values.notes || undefined,
                 items: selectedItems.map((item) => ({
                     productId: item.productId,
@@ -189,7 +269,7 @@ export default function PurchaseOrders() {
         try {
             const payload = {
                 supplierId: Number(values.supplierId),
-                expectedDelivery: values.expectedDelivery ? (values.expectedDelivery.toISOString?.() || values.expectedDelivery) : undefined,
+                expectedDelivery: values.expectedDelivery ? dayjs(values.expectedDelivery).format('YYYY-MM-DD') : undefined,
                 notes: values.notes || undefined,
                 items: selectedItems.map((item) => ({
                     productId: item.productId,
@@ -244,120 +324,152 @@ export default function PurchaseOrders() {
         }
     };
 
+    const filteredPOs = purchaseOrders.filter((po) => {
+        if (activeTab !== 'all') {
+            const t = (po.status || '').toUpperCase();
+            if (activeTab === 'Pending' && t !== 'PENDING' && t !== 'DRAFT') return false;
+            if (activeTab === 'Approved' && t !== 'APPROVED') return false;
+            if (activeTab === 'Received' && t !== 'RECEIVED' && t !== 'COMPLETED') return false;
+        }
+        if (searchText) {
+            const q = searchText.toLowerCase();
+            if (!(po.poNumber || '').toLowerCase().includes(q) && !(po.supplier || '').toLowerCase().includes(q)) return false;
+        }
+        if (supplierFilter != null && po.supplierId !== supplierFilter) return false;
+        return true;
+    });
+
     const columns = [
-        { title: 'PO Number', dataIndex: 'poNumber', key: 'poNumber', render: (v) => <span className="font-bold text-blue-600">{v}</span> },
-        { title: 'Supplier', dataIndex: 'supplier', key: 'supplier' },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={getStatusColor(s)} className="uppercase font-bold">{s}</Tag> },
-        { title: 'Total', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => <span className="font-medium">{formatCurrency(v)}</span> },
-        { title: 'Date', dataIndex: 'orderDate', key: 'orderDate', render: (v) => formatDate(v) },
+        { title: 'PO Number', dataIndex: 'poNumber', key: 'poNumber', width: 120, render: (v) => <span className="font-medium text-blue-600">{v}</span> },
+        { title: 'Supplier', dataIndex: 'supplier', key: 'supplier', width: 160 },
+        { title: 'Status', dataIndex: 'status', key: 'status', width: 110, render: (s) => <Tag color={poStatusColor(s)}>{s}</Tag> },
+        { title: 'Items', key: 'items', width: 80, align: 'center', render: (_, r) => (r.items || []).length },
+        { title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', width: 120, render: (v) => formatCurrency(v) },
+        { title: 'Order Date', dataIndex: 'orderDate', key: 'orderDate', width: 120, render: (v) => formatDate(v) },
+        { title: 'Expected Delivery', dataIndex: 'expectedDelivery', key: 'expectedDelivery', width: 130, render: (v) => formatDate(v) ?? '—' },
         {
             title: 'Actions',
             key: 'actions',
-            render: (_, record) => (
-                <Space>
-                    <Button type="text" icon={<EyeOutlined />} onClick={() => { setSelectedPO(record); setDetailDrawerOpen(true); }} />
-                    {(record.status === 'pending' || record.status === 'draft') && (
-                        <>
-                            <Button type="text" icon={<EditOutlined className="text-blue-500" />} onClick={() => handleEdit(record)} />
-                            <Popconfirm title="Approve PO?" onConfirm={() => handleAction(record.id, 'approve')}><Button type="text" icon={<CheckCircleOutlined className="text-green-500" />} /></Popconfirm>
-                            <Popconfirm
-                                title="Delete this purchase order?"
-                                okText="Delete"
-                                okButtonProps={{ danger: true }}
-                                onConfirm={() => handleDelete(record.id)}
-                            >
-                                <Button type="text" danger icon={<DeleteOutlined />} />
-                            </Popconfirm>
-                        </>
-                    )}
-                    {record.status === 'approved' && (
-                        <span className="text-gray-400 text-xs">(Edit/Delete not available for approved PO)</span>
-                    )}
-                </Space>
-            )
-        }
+            width: 220,
+            render: (_, record) => {
+                const isPending = ['PENDING', 'DRAFT'].includes((record.status || '').toUpperCase());
+                return (
+                    <Space size="small" wrap>
+                        <Button type="link" size="small" icon={<EyeOutlined />} className="text-blue-600 p-0" onClick={() => { setSelectedPO(record); setDetailDrawerOpen(true); }}>View</Button>
+                        <Button type="link" size="small" icon={<PrinterOutlined />} className="text-blue-600 p-0" onClick={() => setPrintPO(record)}>Print</Button>
+                        {isPending && <Button type="link" size="small" icon={<EditOutlined />} className="text-blue-600 p-0" onClick={() => handleEdit(record)}>Edit</Button>}
+                        {isPending && <Popconfirm title="Approve this PO?" onConfirm={() => handleAction(record.id, 'approve')} okText="Yes" cancelText="No"><Button type="link" size="small" className="text-green-600 p-0">Approve</Button></Popconfirm>}
+                        <Popconfirm title="Delete this purchase order?" okText="Yes" cancelText="No" onConfirm={() => handleDelete(record.id)}>
+                            <Button type="link" size="small" danger icon={<DeleteOutlined />} className="p-0">Delete</Button>
+                        </Popconfirm>
+                    </Space>
+                );
+            },
+        },
     ];
 
-    const ItemSelector = () => (
-        <div className="border border-dashed border-gray-300 rounded-2xl p-6 bg-slate-50/50">
-            <h4 className="font-bold mb-4 flex items-center gap-2 text-slate-700">
-                <ShoppingCartOutlined /> Select Procurement Items
-            </h4>
-            <Select
-                showSearch
-                placeholder="Type product name or SKU..."
-                className="w-full mb-6 h-10"
-                onChange={(val) => { const p = products.find(x => x.id === val); if (p) addItem(p); }}
-                options={products.map(p => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
-            />
-
-            {selectedItems.length > 0 ? (
-                <List
-                    dataSource={selectedItems}
-                    renderItem={(item) => (
-                        <List.Item className="border-b-0 px-0">
-                            <div className="flex items-center gap-4 w-full bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-                                <div className="flex-1">
-                                    <div className="font-bold text-slate-800">{item.productName}</div>
-                                    <div className="text-xs text-gray-400 font-mono">{item.productSku}</div>
-                                </div>
-                                <InputNumber min={1} value={item.quantity} onChange={(v) => updateItemQuantity(item.productId, v || 1)} className="rounded-lg" />
-                                <div className="w-24 text-right font-bold text-blue-600">{formatCurrency(item.totalPrice)}</div>
-                                <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => removeItem(item.productId)} />
-                            </div>
-                        </List.Item>
-                    )}
-                />
-            ) : <Empty description="Add items to create order" className="py-4" />}
-
-            {selectedItems.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center px-2">
-                    <span className="text-gray-500 font-medium">Grand Total Cost</span>
-                    <span className="text-2xl font-black text-slate-800">{formatCurrency(calculateTotal())}</span>
-                </div>
-            )}
-        </div>
-    );
+    const pendingCount = purchaseOrders.filter((x) => ['PENDING', 'DRAFT'].includes((x.status || '').toUpperCase())).length;
+    const approvedCount = purchaseOrders.filter((x) => (x.status || '').toUpperCase() === 'APPROVED').length;
+    const receivedCount = purchaseOrders.filter((x) => ['RECEIVED', 'COMPLETED'].includes((x.status || '').toUpperCase())).length;
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">
-                            Purchase Orders
-                        </h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Create and manage purchase orders</p>
+                        <h1 className="text-2xl font-medium text-blue-600">Purchase Orders</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">Manage supplier purchase orders and procurement.</p>
                     </div>
-                    <Button type="primary" icon={<PlusOutlined />} size="large" className="h-12 rounded-xl shadow-lg ring-4 ring-blue-50" onClick={() => { setModalOpen(true); form.resetFields(); setSelectedItems([]); }}>
-                        Add Purchase Order
+                    <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setModalOpen(true); form.resetFields(); setSelectedItems([]); setProductSelectValue(undefined); }}>
+                        Create PO
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-gray-400 font-bold text-[10px] uppercase">Total Logs</div><div className="text-2xl font-black">{purchaseOrders.length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-orange-500 font-bold text-[10px] uppercase">Awaiting Auth</div><div className="text-2xl font-black">{purchaseOrders.filter(x => x.status === 'pending').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-green-500 font-bold text-[10px] uppercase">Finalized</div><div className="text-2xl font-black">{purchaseOrders.filter(x => x.status === 'approved').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-blue-500 font-bold text-[10px] uppercase">Total Value</div><div className="text-2xl font-black">{formatCurrency(purchaseOrders.reduce((s, x) => s + x.totalAmount, 0))}</div></Card>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm font-normal">Total POs</div>
+                        <div className="text-xl font-medium text-blue-600">{purchaseOrders.length}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm font-normal">Pending</div>
+                        <div className="text-xl font-medium text-red-600">{pendingCount}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm font-normal">Approved</div>
+                        <div className="text-xl font-medium text-green-600">{approvedCount}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm font-normal">Received</div>
+                        <div className="text-xl font-medium text-red-600">{receivedCount}</div>
+                    </Card>
                 </div>
 
-                <Card className="rounded-2xl shadow-sm border-gray-100 overflow-hidden">
-                    <div className="mb-6 flex gap-4">
-                        <Search placeholder="PO# or Supplier..." className="max-w-md" onChange={e => { }} prefix={<SearchOutlined />} />
-                        <Button icon={<ReloadOutlined />} onClick={fetchPurchaseOrders}>Live Update</Button>
+                <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
+                    <Tabs
+                        activeKey={activeTab}
+                        onChange={setActiveTab}
+                        className="[&_.ant-tabs-nav]:mb-4"
+                        items={[
+                            { key: 'all', label: `All Orders (${purchaseOrders.length})` },
+                            { key: 'Pending', label: `Pending (${pendingCount})` },
+                            { key: 'Approved', label: `Approved (${approvedCount})` },
+                            { key: 'Received', label: `Received (${receivedCount})` },
+                        ]}
+                    />
+                    <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
+                        <Search placeholder="Search POs..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="max-w-xs rounded-lg" prefix={<SearchOutlined />} allowClear />
+                        <Select placeholder="Supplier" allowClear value={supplierFilter} onChange={setSupplierFilter} className="w-48 rounded-lg" options={suppliers.map((s) => ({ value: s.id, label: s.name }))} />
+                        <Button icon={<FilterOutlined />} className="rounded-lg">More Filters</Button>
+                        <Button icon={<ReloadOutlined />} onClick={fetchPurchaseOrders} loading={loading} className="rounded-lg">Refresh</Button>
                     </div>
-                    <Table columns={columns} dataSource={purchaseOrders} rowKey="id" loading={loading} />
+                    <Table columns={columns} dataSource={filteredPOs} rowKey="id" loading={loading} pagination={{ showSizeChanger: true, showTotal: (t) => `Total ${t} orders`, pageSize: 20 }} className="[&_.ant-table-thead_th]:font-normal" scroll={{ x: 900 }} />
                 </Card>
 
                 {/* Create PO Modal */}
-                <Modal title="Procurement Order Request" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} width={800} className="rounded-2xl overflow-hidden">
-                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-4">
+                <Modal title="Create Purchase Order" open={modalOpen} onCancel={() => setModalOpen(false)} footer={null} width={720} className="rounded-xl">
+                    <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-2">
                         <div className="grid grid-cols-2 gap-4">
-                            <Form.Item label="Target Supplier" name="supplierId" rules={[{ required: true }]}><Select placeholder="Select vendor" className="h-10 rounded-lg shadow-sm">{suppliers.map(s => <Option key={s.id} value={s.id}>{s.name}</Option>)}</Select></Form.Item>
-                            <Form.Item label="Expected Arrival" name="expectedDelivery"><DatePicker className="w-full h-10 rounded-lg shadow-sm" /></Form.Item>
+                            <Form.Item label="Supplier" name="supplierId" rules={[{ required: true, message: 'Select supplier' }]}>
+                                <Select placeholder="Select supplier" allowClear className="rounded-lg" options={suppliers.map((s) => ({ value: s.id, label: s.name }))} />
+                            </Form.Item>
+                            <Form.Item label="Expected Delivery Date" name="expectedDelivery">
+                                <DatePicker placeholder="Select date" className="w-full rounded-lg" format="MM/DD/YYYY" />
+                            </Form.Item>
                         </div>
-                        <ItemSelector />
-                        <Form.Item label="Order Memo" name="notes" className="mt-4"><Input.TextArea rows={2} className="rounded-xl" /></Form.Item>
+                        <div className="border border-dashed border-gray-200 rounded-xl p-4 bg-gray-50/50 mt-2">
+                            <h4 className="font-medium mb-3 flex items-center gap-2 text-gray-700">
+                                <ShoppingCartOutlined /> Add Products/Bundles
+                            </h4>
+                            <Select showSearch placeholder="Search and select products..." allowClear value={productSelectValue} onChange={(val) => { if (val) { const p = products.find((x) => x.id === val); if (p) addItem(p); } }} onClear={() => setProductSelectValue(undefined)} className="w-full rounded-lg mb-4" optionFilterProp="label" filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))} />
+                            {selectedItems.length > 0 ? (
+                                <div className="space-y-2">
+                                    {selectedItems.map((item) => (
+                                        <div key={item.productId} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-100">
+                                            <div className="flex-1">
+                                                <div className="font-medium text-gray-800">{item.productName}</div>
+                                                <div className="text-xs text-gray-500">{item.productSku}</div>
+                                            </div>
+                                            <InputNumber min={1} value={item.quantity} onChange={(v) => updateItemQuantity(item.productId, v || 1)} className="w-20 rounded-lg" />
+                                            <span className="text-gray-500 whitespace-nowrap">x {formatCurrency(item.unitPrice)}</span>
+                                            <span className="font-medium w-20 text-right">{formatCurrency(item.totalPrice)}</span>
+                                            <Button type="text" danger size="small" icon={<MinusCircleOutlined />} onClick={() => removeItem(item.productId)} />
+                                        </div>
+                                    ))}
+                                    <div className="flex justify-end pt-2 border-t border-gray-200">
+                                        <span className="font-medium">Total: {formatCurrency(calculateTotal())}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="py-6 text-center text-gray-400 text-sm">No products added yet. Search and select above.</div>
+                            )}
+                        </div>
+                        <Form.Item label="Notes (Optional)" name="notes" className="mt-4">
+                            <Input.TextArea rows={3} placeholder="Add any notes..." className="rounded-lg" />
+                        </Form.Item>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button onClick={() => setModalOpen(false)} className="rounded-lg">Cancel</Button>
+                            <Button type="primary" htmlType="submit" className="bg-blue-600 border-blue-600 rounded-lg">Create</Button>
+                        </div>
                     </Form>
                 </Modal>
 
@@ -370,18 +482,55 @@ export default function PurchaseOrders() {
                         editForm.resetFields();
                         setSelectedPO(null);
                         setSelectedItems([]);
+                        setProductSelectValue(undefined);
                     }}
-                    onOk={() => editForm.submit()}
-                    width={800}
-                    className="rounded-2xl overflow-hidden"
+                    footer={null}
+                    width={720}
+                    className="rounded-xl"
                 >
-                    <Form form={editForm} layout="vertical" onFinish={handleEditSubmit} className="pt-4">
+                    <Form form={editForm} layout="vertical" onFinish={handleEditSubmit} className="pt-2">
                         <div className="grid grid-cols-2 gap-4">
-                            <Form.Item label="Target Supplier" name="supplierId" rules={[{ required: true }]}><Select placeholder="Select vendor" className="h-10 rounded-lg shadow-sm">{suppliers.map((s) => <Option key={s.id} value={s.id}>{s.name}</Option>)}</Select></Form.Item>
-                            <Form.Item label="Expected Arrival" name="expectedDelivery"><DatePicker className="w-full h-10 rounded-lg shadow-sm" /></Form.Item>
+                            <Form.Item label="Supplier" name="supplierId" rules={[{ required: true, message: 'Select supplier' }]}>
+                                <Select placeholder="Select supplier" allowClear className="rounded-lg" options={suppliers.map((s) => ({ value: s.id, label: s.name }))} />
+                            </Form.Item>
+                            <Form.Item label="Expected Delivery Date" name="expectedDelivery">
+                                <DatePicker placeholder="Select date" className="w-full rounded-lg" format="MM/DD/YYYY" />
+                            </Form.Item>
                         </div>
-                        <ItemSelector />
-                        <Form.Item label="Order Memo" name="notes" className="mt-4"><Input.TextArea rows={2} className="rounded-xl" /></Form.Item>
+                        <div className="border border-dashed border-gray-200 rounded-xl p-4 bg-gray-50/50 mt-2">
+                            <h4 className="font-medium mb-3 flex items-center gap-2 text-gray-700">
+                                <ShoppingCartOutlined /> Add Products/Bundles
+                            </h4>
+                            <Select showSearch placeholder="Search and select products..." allowClear value={productSelectValue} onChange={(val) => { if (val) { const p = products.find((x) => x.id === val); if (p) addItem(p); } }} onClear={() => setProductSelectValue(undefined)} className="w-full rounded-lg mb-4" optionFilterProp="label" filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))} />
+                            {selectedItems.length > 0 ? (
+                                <div className="space-y-2">
+                                    {selectedItems.map((item) => (
+                                        <div key={item.productId} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-100">
+                                            <div className="flex-1">
+                                                <div className="font-medium text-gray-800">{item.productName}</div>
+                                                <div className="text-xs text-gray-500">{item.productSku}</div>
+                                            </div>
+                                            <InputNumber min={1} value={item.quantity} onChange={(v) => updateItemQuantity(item.productId, v || 1)} className="w-20 rounded-lg" />
+                                            <span className="text-gray-500 whitespace-nowrap">x {formatCurrency(item.unitPrice)}</span>
+                                            <span className="font-medium w-20 text-right">{formatCurrency(item.totalPrice)}</span>
+                                            <Button type="text" danger size="small" icon={<MinusCircleOutlined />} onClick={() => removeItem(item.productId)} />
+                                        </div>
+                                    ))}
+                                    <div className="flex justify-end pt-2 border-t border-gray-200">
+                                        <span className="font-medium">Total: {formatCurrency(calculateTotal())}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="py-6 text-center text-gray-400 text-sm">No products added yet. Search and select above.</div>
+                            )}
+                        </div>
+                        <Form.Item label="Notes (Optional)" name="notes" className="mt-4">
+                            <Input.TextArea rows={3} placeholder="Add any notes..." className="rounded-lg" />
+                        </Form.Item>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button onClick={() => { setEditModalOpen(false); editForm.resetFields(); setSelectedPO(null); setSelectedItems([]); setProductSelectValue(undefined); }} className="rounded-lg">Cancel</Button>
+                            <Button type="primary" htmlType="submit" className="bg-blue-600 border-blue-600 rounded-lg">Update</Button>
+                        </div>
                     </Form>
                 </Modal>
 
@@ -389,7 +538,7 @@ export default function PurchaseOrders() {
                 <Drawer title={`PO Details: ${selectedPO?.poNumber}`} width={600} open={detailDrawerOpen} onClose={() => setDetailDrawerOpen(false)} className="rounded-l-3xl">
                     {selectedPO && (
                         <div className="space-y-6">
-                            <div className="flex justify-between items-center"><Tag color={getStatusColor(selectedPO.status)} className="px-4 py-1 rounded-full font-bold uppercase">{selectedPO.status}</Tag><span className="font-mono text-gray-400">{formatDate(selectedPO.orderDate)}</span></div>
+                            <div className="flex justify-between items-center"><Tag color={poStatusColor(selectedPO.status)}>{selectedPO.status}</Tag><span className="font-mono text-gray-400">{formatDate(selectedPO.orderDate)}</span></div>
                             <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
                                 <div className="text-gray-400 text-xs font-bold uppercase mb-2">Supplier Info</div>
                                 <div className="text-xl font-bold text-slate-800">{selectedPO.supplier}</div>

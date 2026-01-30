@@ -45,6 +45,7 @@ async function create(data, reqUser) {
     locationType: data.locationType || null,
     pickSequence: data.pickSequence != null ? Number(data.pickSequence) : null,
     maxWeight: data.maxWeight != null ? Number(data.maxWeight) : null,
+    heatSensitive: data.heatSensitive || null,
   });
 }
 
@@ -61,6 +62,7 @@ async function update(id, data, reqUser) {
     locationType: data.locationType !== undefined ? data.locationType : loc.locationType,
     pickSequence: data.pickSequence !== undefined ? (data.pickSequence != null ? Number(data.pickSequence) : null) : loc.pickSequence,
     maxWeight: data.maxWeight !== undefined ? (data.maxWeight != null ? Number(data.maxWeight) : null) : loc.maxWeight,
+    heatSensitive: data.heatSensitive !== undefined ? data.heatSensitive : loc.heatSensitive,
   });
   return loc;
 }

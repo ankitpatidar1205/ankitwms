@@ -41,7 +41,7 @@ async function create(body, reqUser) {
   if (!companyId) throw new Error('Company context required');
 
   const count = await PurchaseOrder.count({ where: { companyId } });
-  const poNumber = `PO-${Date.now()}-${String(count + 1).padStart(4, '0')}`;
+  const poNumber = `PO${String(count + 1).padStart(3, '0')}`;
 
   const supplier = await Supplier.findByPk(body.supplierId);
   if (!supplier || supplier.companyId !== companyId) throw new Error('Invalid supplier');

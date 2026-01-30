@@ -128,7 +128,7 @@ export default function AddProduct() {
                 cartons: null,
                 priceLists: null,
             };
-            await apiRequest('/api/inventory/products', { method: 'POST', body: JSON.stringify(payload) }, token);
+            const res = await apiRequest('/api/inventory/products', { method: 'POST', body: JSON.stringify(payload) }, token);
             message.success('Product created successfully!');
             form.resetFields();
             setImageList([]);
