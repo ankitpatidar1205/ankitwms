@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Table, Tag, message } from 'antd';
+import { Card, Row, Col, Table, Tag, message, Spin } from 'antd';
 import {
     ShopOutlined,
     TeamOutlined,
     ShoppingCartOutlined,
-    DollarOutlined,
+    HomeOutlined,
     SafetyCertificateOutlined,
     BarChartOutlined,
     SettingOutlined,
@@ -50,116 +50,115 @@ export default function SuperAdminDashboard() {
     useEffect(() => {
         fetchStats();
     }, [fetchStats]);
+
     const quickLinks = [
-        { to: '/companies', icon: <ShopOutlined />, label: 'Company Management', desc: 'List, Add, Edit, Activate companies' },
-        { to: '/users', icon: <TeamOutlined />, label: 'User Management', desc: 'Company Admins, Reset Password, Lock/Unlock' },
-        { to: '/reports', icon: <BarChartOutlined />, label: 'Reports', desc: 'Company-wise usage, orders, storage' },
-        { to: '/settings', icon: <SettingOutlined />, label: 'System Settings', desc: 'Global config, Email/SMS templates' },
-        { to: '/settings', icon: <SafetyCertificateOutlined />, label: 'Security & Logs', desc: 'Login history, Activity logs' },
+        { to: '/companies', icon: <ShopOutlined />, label: 'Company Management', desc: 'List, add, edit companies' },
+        { to: '/users', icon: <TeamOutlined />, label: 'User Management', desc: 'Admins, reset password, lock/unlock' },
+        { to: '/reports', icon: <BarChartOutlined />, label: 'Reports', desc: 'Usage, orders, storage' },
+        { to: '/settings', icon: <SettingOutlined />, label: 'System Settings', desc: 'Global config, templates' },
+        { to: '/settings', icon: <SafetyCertificateOutlined />, label: 'Security & Logs', desc: 'Login history, activity logs' },
     ];
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <div className="flex flex-col justify-center items-center min-h-[320px] gap-4">
+                    <Spin size="large" />
+                    <p className="text-gray-500 text-sm font-medium">Loading dashboard…</p>
+                </div>
+            </MainLayout>
+        );
+    }
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-3">
-                            <CrownOutlined className="text-amber-500" /> Super Admin
-                        </h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose mt-1">
-                            System-wide overview • All companies • Global controls
-                        </p>
-                    </div>
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-3">
+                        <span className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                            <CrownOutlined className="text-lg" />
+                        </span>
+                        Super Admin
+                    </h1>
+                    <p className="text-gray-500 text-sm mt-1">System-wide overview • All companies • Global controls</p>
                 </div>
 
-                {/* KPI Row */}
-                <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Total Companies"
-                            value={loading ? '—' : stats.totalCompanies}
-                            icon={<ShopOutlined />}
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Active Users"
-                            value={loading ? '—' : stats.activeUsers}
-                            icon={<TeamOutlined />}
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Total Orders (All)"
-                            value={loading ? '—' : stats.totalOrders}
-                            icon={<ShoppingCartOutlined />}
-                        />
-                    </Col>
-                    <Col xs={24} sm={12} lg={6}>
-                        <KPICard
-                            title="Warehouses"
-                            value={loading ? '—' : stats.totalWarehouses}
-                            icon={<DollarOutlined />}
-                        />
-                    </Col>
-                </Row>
+                <div>
+                    <h2 className="text-base font-semibold text-slate-700 mb-4">Key metrics</h2>
+                    <Row gutter={[16, 16]}>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Total Companies" value={stats.totalCompanies} icon={<ShopOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Active Users" value={stats.activeUsers} icon={<TeamOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Total Orders (All)" value={stats.totalOrders} icon={<ShoppingCartOutlined />} />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <KPICard title="Warehouses" value={stats.totalWarehouses} icon={<HomeOutlined />} />
+                        </Col>
+                    </Row>
+                </div>
 
-                {/* System Health */}
-                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px 24px' }}>
                     <div className="flex items-center justify-between flex-wrap gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                                <SafetyCertificateOutlined className="text-2xl text-green-600" />
+                            <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                                <SafetyCertificateOutlined className="text-xl text-green-600" />
                             </div>
                             <div>
-                                <div className="text-sm font-bold text-gray-500 uppercase">System Health</div>
-                                <div className="text-xl font-black text-green-600">{stats.systemHealth}</div>
+                                <div className="text-xs font-medium text-gray-500">System Health</div>
+                                <div className="text-lg font-semibold text-green-700">{stats.systemHealth}</div>
                             </div>
                         </div>
-                        <Tag color="green" className="text-sm font-bold">All systems operational</Tag>
+                        <Tag color="green">All systems operational</Tag>
                     </div>
                 </Card>
 
-                {/* Quick Links - Core Modules */}
-                <Card title={<span className="font-black uppercase tracking-tight">Quick Access</span>} className="rounded-2xl shadow-sm border-slate-100">
+                <div>
+                    <h2 className="text-base font-semibold text-slate-700 mb-4">Quick access</h2>
                     <Row gutter={[16, 16]}>
                         {quickLinks.map((link, i) => (
                             <Col xs={24} sm={12} md={8} key={i}>
-                                <Link to={link.to}>
-                                    <Card size="small" className="rounded-xl border-slate-100 hover:border-blue-300 hover:shadow-md transition-all h-full">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                                                    {link.icon}
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-slate-800">{link.label}</div>
-                                                    <div className="text-xs text-gray-500">{link.desc}</div>
-                                                </div>
+                                <Link to={link.to} className="block h-full">
+                                    <Card
+                                        size="small"
+                                        className="h-full rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:shadow-md transition-all duration-200"
+                                        bodyStyle={{ padding: '16px' }}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                                                {link.icon}
                                             </div>
-                                            <ArrowRightOutlined className="text-gray-400" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-semibold text-slate-800">{link.label}</div>
+                                                <div className="text-xs text-gray-500 mt-0.5">{link.desc}</div>
+                                            </div>
+                                            <ArrowRightOutlined className="text-gray-400 shrink-0" />
                                         </div>
                                     </Card>
                                 </Link>
                             </Col>
                         ))}
                     </Row>
-                </Card>
+                </div>
 
-                {/* Activity / Logs */}
-                <Card title={<span className="font-black uppercase tracking-tight">Recent Activity / Logs</span>} className="rounded-2xl shadow-sm border-slate-100">
+                <Card
+                    title={<span className="font-semibold text-slate-800">Recent Activity</span>}
+                    className="rounded-xl border border-gray-100 shadow-sm"
+                >
                     <Table
                         dataSource={recentActivity}
                         columns={[
-                            { title: 'Action', dataIndex: 'action', key: 'action', render: (t, r) => <span className="font-medium">{t}</span> },
-                            { title: 'Time', dataIndex: 'time', key: 'time', width: 120 },
+                            { title: 'Action', dataIndex: 'action', key: 'action', render: (t) => <span className="font-medium text-slate-700">{t}</span> },
+                            { title: 'Time', dataIndex: 'time', key: 'time', width: 120, className: 'text-gray-500' },
                             {
                                 title: '',
                                 key: 'type',
+                                width: 80,
                                 render: (_, r) => (
-                                    <Tag color={r.type === 'success' ? 'green' : r.type === 'warning' ? 'orange' : 'blue'}>
-                                        {r.type}
-                                    </Tag>
+                                    <Tag color={r.type === 'success' ? 'green' : r.type === 'warning' ? 'orange' : 'blue'}>{r.type}</Tag>
                                 ),
                             },
                         ]}

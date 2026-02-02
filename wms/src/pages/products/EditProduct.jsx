@@ -48,6 +48,49 @@ export default function EditProduct() {
     const [priceListModalOpen, setPriceListModalOpen] = useState(false);
     const [cartonForm] = Form.useForm();
     const [priceListForm] = Form.useForm();
+    const [savingCartons, setSavingCartons] = useState(false);
+    const [savingPriceList, setSavingPriceList] = useState(false);
+    const [productData, setProductData] = useState(null);
+    const [vatCodes, setVatCodes] = useState([]);
+
+    /** Save cartons to API immediately (no need to click Save Changes) */
+    const saveCartonsToApi = useCallback(async (newCartonList) => {
+        if (!token || !id) return;
+        try {
+            setSavingCartons(true);
+            const payload = newCartonList.map((c) => ({ id: c.id, barcode: c.barcode || null, caseSize: c.caseSize != null ? c.caseSize : null, description: c.description || null }));
+            await apiRequest(`/api/inventory/products/${id}`, { method: 'PUT', body: JSON.stringify({ cartons: payload }) }, token);
+            setCartonList(newCartonList);
+            message.success('Carton saved');
+        } catch (err) {
+            message.error(err?.data?.message || err?.message || 'Failed to save carton');
+        } finally {
+            setSavingCartons(false);
+        }
+    }, [token, id]);
+
+    /** Save supplier price list to API immediately */
+    const saveSupplierProductsToApi = useCallback(async (newList) => {
+        if (!token || !id) return;
+        try {
+            setSavingPriceList(true);
+            const payload = newList.map((s) => ({
+                id: s.id,
+                supplierId: s.supplierId,
+                supplierSku: s.supplierSku ?? null,
+                caseSize: s.caseSize != null ? s.caseSize : null,
+                caseCost: s.caseCost != null ? s.caseCost : null,
+                unitCost: s.unitCost != null ? s.unitCost : null,
+            }));
+            await apiRequest(`/api/inventory/products/${id}`, { method: 'PUT', body: JSON.stringify({ supplierProducts: payload }) }, token);
+            setSupplierProductList(newList);
+            message.success('Price list saved');
+        } catch (err) {
+            message.error(err?.data?.message || err?.message || 'Failed to save price list');
+        } finally {
+            setSavingPriceList(false);
+        }
+    }, [token, id]);
 
     const fetchProduct = useCallback(async () => {
         if (!token || !id) return;
@@ -57,44 +100,7 @@ export default function EditProduct() {
             const p = res?.data ?? res;
             if (!p) throw new Error('Product not found');
             setProductSku(p.sku || '');
-            const ms = p.marketplaceSkus && typeof p.marketplaceSkus === 'object' ? p.marketplaceSkus : {};
-            form.setFieldsValue({
-                name: p.name,
-                sku: p.sku,
-                barcode: p.barcode ?? undefined,
-                description: p.description ?? undefined,
-                productType: p.productType ?? 'SIMPLE',
-                unitOfMeasure: p.unitOfMeasure ?? 'EACH',
-                categoryId: p.categoryId ?? undefined,
-                supplierId: p.supplierId ?? undefined,
-                status: p.status ?? 'ACTIVE',
-                price: p.price != null ? Number(p.price) : 0,
-                costPrice: p.costPrice != null ? Number(p.costPrice) : undefined,
-                vatRate: p.vatRate != null ? Number(p.vatRate) : undefined,
-                vatCode: p.vatCode ?? undefined,
-                customsTariff: p.customsTariff ?? undefined,
-                hdSku: ms.hdSku ?? undefined,
-                hdSaleSku: ms.hdSaleSku ?? undefined,
-                warehouseId: ms.warehouseId ?? undefined,
-                ebayId: ms.ebayId ?? undefined,
-                amazonSku: ms.amazonSku ?? undefined,
-                amazonSkuSplitBefore: ms.amazonSkuSplitBefore ?? undefined,
-                amazonMpnSku: ms.amazonMpnSku ?? undefined,
-                amazonIdSku: ms.amazonIdSku ?? undefined,
-                heatSensitive: p.heatSensitive ?? undefined,
-                perishable: p.perishable ?? undefined,
-                requireBatchTracking: p.requireBatchTracking ?? undefined,
-                shelfLifeDays: p.shelfLifeDays ?? undefined,
-                length: p.length != null ? Number(p.length) : undefined,
-                width: p.width != null ? Number(p.width) : undefined,
-                height: p.height != null ? Number(p.height) : undefined,
-                dimensionUnit: p.dimensionUnit ?? 'cm',
-                weight: p.weight != null ? Number(p.weight) : undefined,
-                weightUnit: p.weightUnit ?? 'kg',
-                reorderLevel: p.reorderLevel ?? 0,
-                reorderQty: p.reorderQty ?? undefined,
-                maxStock: p.maxStock ?? undefined,
-            });
+            setProductData(p);
             const imgs = Array.isArray(p.images) ? p.images : [];
             setImageList(imgs.map((url, idx) => ({ uid: `existing-${idx}`, url, name: `image-${idx}` })));
             const cartonsRaw = p.cartons;
@@ -134,11 +140,72 @@ export default function EditProduct() {
         }
     }, [token]);
 
+    const fetchVatCodes = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await apiRequest('/api/vat-codes', { method: 'GET' }, token);
+            setVatCodes(Array.isArray(res?.data) ? res.data : []);
+        } catch (_) {
+            setVatCodes([]);
+        }
+    }, [token]);
+
     useEffect(() => {
         fetchProduct();
         fetchCategories();
         fetchSuppliers();
-    }, [fetchProduct, fetchCategories, fetchSuppliers]);
+        fetchVatCodes();
+    }, [fetchProduct, fetchCategories, fetchSuppliers, fetchVatCodes]);
+
+    // Prefill form after product is loaded and form is mounted – jo data add hai woh dikhe
+    useEffect(() => {
+        if (!productData || loading) return;
+        let ms = productData.marketplaceSkus;
+        if (typeof ms === 'string') { try { ms = JSON.parse(ms); } catch { ms = {}; } }
+        ms = (ms && typeof ms === 'object' && !Array.isArray(ms)) ? ms : {};
+        const num = (v) => (v != null && v !== '' ? Number(v) : undefined);
+        form.setFieldsValue({
+            name: productData.name ?? '',
+            sku: productData.sku ?? '',
+            barcode: productData.barcode ?? undefined,
+            description: productData.description ?? undefined,
+            productType: productData.productType ?? 'SIMPLE',
+            unitOfMeasure: productData.unitOfMeasure ?? 'EACH',
+            categoryId: productData.categoryId ?? undefined,
+            supplierId: productData.supplierId ?? undefined,
+            status: productData.status ?? 'ACTIVE',
+            price: productData.price != null ? Number(productData.price) : 0,
+            costPrice: num(productData.costPrice),
+            vatRate: num(productData.vatRate),
+            vatCode: productData.vatCode ?? undefined,
+            customsTariff: productData.customsTariff ?? undefined,
+            hdSku: ms.hdSku ?? '',
+            hdSaleSku: ms.hdSaleSku ?? '',
+            warehouseId: ms.warehouseId ?? '',
+            ebayId: ms.ebayId ?? '',
+            amazonSku: ms.amazonSku ?? '',
+            amazonSkuSplitBefore: ms.amazonSkuSplitBefore ?? '',
+            amazonMpnSku: ms.amazonMpnSku ?? '',
+            amazonIdSku: ms.amazonIdSku ?? '',
+            heatSensitive: productData.heatSensitive ?? undefined,
+            perishable: productData.perishable ?? undefined,
+            requireBatchTracking: productData.requireBatchTracking ?? undefined,
+            shelfLifeDays: productData.shelfLifeDays != null ? Number(productData.shelfLifeDays) : undefined,
+            length: num(productData.length),
+            width: num(productData.width),
+            height: num(productData.height),
+            dimensionUnit: productData.dimensionUnit ?? 'cm',
+            weight: num(productData.weight),
+            weightUnit: productData.weightUnit ?? 'kg',
+            reorderLevel: productData.reorderLevel ?? 0,
+            reorderQty: productData.reorderQty != null ? Number(productData.reorderQty) : undefined,
+            maxStock: productData.maxStock != null ? Number(productData.maxStock) : undefined,
+            priceAmazon: productData.priceLists?.AMAZON != null ? Number(productData.priceLists.AMAZON) : undefined,
+            priceEbay: productData.priceLists?.EBAY != null ? Number(productData.priceLists.EBAY) : undefined,
+            priceShopify: productData.priceLists?.SHOPIFY != null ? Number(productData.priceLists.SHOPIFY) : undefined,
+            priceDirect: productData.priceLists?.DIRECT != null ? Number(productData.priceLists.DIRECT) : (productData.price != null ? Number(productData.price) : undefined),
+        });
+    }, [productData, loading, form]);
 
     const fileToBase64 = (file) =>
         new Promise((resolve, reject) => {
@@ -189,14 +256,14 @@ export default function EditProduct() {
                 vatCode: values.vatCode || null,
                 customsTariff: values.customsTariff != null ? String(values.customsTariff) : null,
                 marketplaceSkus: {
-                    hdSku: values.hdSku || null,
-                    hdSaleSku: values.hdSaleSku || null,
-                    warehouseId: values.warehouseId || null,
-                    ebayId: values.ebayId || null,
-                    amazonSku: values.amazonSku || null,
-                    amazonSkuSplitBefore: values.amazonSkuSplitBefore || null,
-                    amazonMpnSku: values.amazonMpnSku || null,
-                    amazonIdSku: values.amazonIdSku || null,
+                    hdSku: values.hdSku?.trim() || null,
+                    hdSaleSku: values.hdSaleSku?.trim() || null,
+                    warehouseId: values.warehouseId?.trim() || null,
+                    ebayId: values.ebayId?.trim() || null,
+                    amazonSku: values.amazonSku?.trim() || null,
+                    amazonSkuSplitBefore: values.amazonSkuSplitBefore?.trim() || null,
+                    amazonMpnSku: values.amazonMpnSku?.trim() || null,
+                    amazonIdSku: values.amazonIdSku?.trim() || null,
                 },
                 heatSensitive: values.heatSensitive || null,
                 perishable: values.perishable || null,
@@ -212,6 +279,12 @@ export default function EditProduct() {
                 reorderQty: values.reorderQty != null ? values.reorderQty : null,
                 maxStock: values.maxStock != null ? values.maxStock : null,
                 status: values.status || 'ACTIVE',
+                priceLists: {
+                    AMAZON: values.priceAmazon != null ? Number(values.priceAmazon) : null,
+                    EBAY: values.priceEbay != null ? Number(values.priceEbay) : null,
+                    SHOPIFY: values.priceShopify != null ? Number(values.priceShopify) : null,
+                    DIRECT: values.priceDirect != null ? Number(values.priceDirect) : null,
+                },
                 images: imageList.map((i) => i.url),
                 cartons: cartonList.map((c) => ({ id: c.id, barcode: c.barcode || null, caseSize: c.caseSize != null ? c.caseSize : null, description: c.description || null })),
                 supplierProducts: supplierProductList.map((s) => ({
@@ -225,9 +298,12 @@ export default function EditProduct() {
             };
             await apiRequest(`/api/inventory/products/${id}`, { method: 'PUT', body: JSON.stringify(payload) }, token);
             message.success('Product updated successfully!');
-            navigate('/products');
+            await fetchProduct();
+            setTimeout(() => navigate(`/products/${id}`), 600);
         } catch (err) {
-            message.error(err?.data?.message || err?.message || 'Failed to update product');
+            const msg = err?.data?.message || err?.message || 'Failed to update product';
+            message.error(msg);
+            console.error('Product update failed:', err?.data || err);
         } finally {
             setSaving(false);
         }
@@ -253,6 +329,7 @@ export default function EditProduct() {
     const tabItems = [
         {
             key: 'basic',
+            forceRender: true,
             label: (
                 <span>
                     <AppstoreOutlined /> Basic Info
@@ -320,6 +397,7 @@ export default function EditProduct() {
         },
         {
             key: 'pricing',
+            forceRender: true,
             label: (
                 <span>
                     <DollarOutlined /> Pricing & VAT
@@ -345,18 +423,51 @@ export default function EditProduct() {
                             </div>
                         </Col>
                         <Col xs={24} md={8}>
-                            <Form.Item label="VAT Rate (%)" name="vatRate">
-                                <InputNumber className="w-full rounded-lg" size="large" min={0} max={100} step={0.1} placeholder="20.0" />
+                            <Form.Item label="VAT Code" name="vatCode">
+                                <Select
+                                    placeholder="Select VAT code"
+                                    className="w-full rounded-lg"
+                                    size="large"
+                                    allowClear
+                                    showSearch
+                                    optionFilterProp="label"
+                                    options={vatCodes.map((v) => ({ value: v.code, label: `${v.code} — ${v.ratePercent != null ? Number(v.ratePercent) : 0}%` }))}
+                                    onChange={(code) => {
+                                        const selected = vatCodes.find((c) => c.code === code);
+                                        if (selected && selected.ratePercent != null) form.setFieldValue('vatRate', Number(selected.ratePercent));
+                                    }}
+                                />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={8}>
-                            <Form.Item label="VAT Code" name="vatCode">
-                                <Input placeholder="e.g. A_FOOD_PLANRISCUIT" className="rounded-lg" size="large" />
+                            <Form.Item label="VAT Rate (%)" name="vatRate" help="Set from VAT Code (editable if needed)">
+                                <InputNumber className="w-full rounded-lg" size="large" min={0} max={100} step={0.1} placeholder="20.0" />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={8}>
                             <Form.Item label="Customs Tariff" name="customsTariff">
                                 <Input placeholder="e.g. 12" className="rounded-lg" size="large" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={24}><div className="text-gray-600 font-medium mt-4 mb-2">Channel Prices (Amazon, eBay, Shopify, Direct) – editable here</div></Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item label="Amazon Price" name="priceAmazon">
+                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item label="eBay Price" name="priceEbay">
+                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item label="Shopify Price" name="priceShopify">
+                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item label="Direct / Default Price" name="priceDirect">
+                                <InputNumber className="w-full rounded-lg" size="large" min={0} step={0.01} addonBefore="€" placeholder="0.00" />
                             </Form.Item>
                         </Col>
                     </Row>
@@ -365,6 +476,7 @@ export default function EditProduct() {
         },
         {
             key: 'cartons',
+            forceRender: true,
             label: (
                 <span>
                     <InboxOutlined /> Cartons
@@ -374,8 +486,9 @@ export default function EditProduct() {
                 <Card className="rounded-2xl shadow-sm border-gray-100">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-slate-800">Outer Carton Configurations</h3>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={() => { cartonForm.resetFields(); setCartonModalOpen(true); }} className="bg-blue-600 border-blue-600">+ Add Carton Barcode</Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => { cartonForm.resetFields(); setCartonModalOpen(true); }} className="bg-blue-600 border-blue-600">Add Carton Barcode</Button>
                     </div>
+                    <p className="text-gray-500 text-sm mb-4">When outer barcode is scanned at receiving, the system will add <strong>Case Size</strong> units automatically (e.g. 1 box = 48 bars).</p>
                     <Table
                         size="small"
                         dataSource={cartonList}
@@ -388,18 +501,24 @@ export default function EditProduct() {
                             {
                                 title: 'Actions',
                                 key: 'actions',
-                                render: (_, r) => (
-                                    <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => setCartonList((prev) => prev.filter((c) => c.id !== r.id))}>Delete</Button>
-                                ),
+                                        render: (_, r) => (
+                                            <Button type="text" danger size="small" icon={<DeleteOutlined />} loading={savingCartons} onClick={async () => {
+                                                const newList = cartonList.filter((c) => c.id !== r.id);
+                                                setCartonList(newList);
+                                                await saveCartonsToApi(newList);
+                                            }}>Delete</Button>
+                                        ),
                             },
                         ]}
                     />
                     <Modal title="Add Carton Barcode" open={cartonModalOpen} onCancel={() => setCartonModalOpen(false)} footer={null} destroyOnClose>
-                        <Form form={cartonForm} layout="vertical" onFinish={(values) => {
-                            const id = `c-${Date.now()}`;
-                            setCartonList((prev) => [...prev, { id, barcode: values.outerBarcode?.trim() || '', caseSize: values.caseSize != null ? Number(values.caseSize) : null, description: values.description?.trim() || '' }]);
+                        <Form form={cartonForm} layout="vertical" onFinish={async (values) => {
+                            const newId = `c-${Date.now()}`;
+                            const newRow = { id: newId, barcode: values.outerBarcode?.trim() || '', caseSize: values.caseSize != null ? Number(values.caseSize) : null, description: values.description?.trim() || '' };
+                            const newList = [...cartonList, newRow];
                             cartonForm.resetFields();
                             setCartonModalOpen(false);
+                            await saveCartonsToApi(newList);
                         }}>
                             <Form.Item name="outerBarcode" label="Outer Barcode" rules={[{ required: true, message: 'Required' }]}>
                                 <Input placeholder="Scan or enter case barcode" className="rounded-lg" />
@@ -421,6 +540,7 @@ export default function EditProduct() {
         },
         {
             key: 'pricelists',
+            forceRender: true,
             label: (
                 <span>
                     <DollarOutlined /> Price Lists
@@ -430,7 +550,7 @@ export default function EditProduct() {
                 <Card className="rounded-2xl shadow-sm border-gray-100">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-slate-800">Supplier Price Lists</h3>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={() => { priceListForm.resetFields(); setPriceListModalOpen(true); }} className="bg-blue-600 border-blue-600">+ Add Price List</Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => { priceListForm.resetFields(); setPriceListModalOpen(true); }} className="bg-blue-600 border-blue-600">Add Price List</Button>
                     </div>
                     {(() => {
                         const getSupplierName = (sid) => { const s = suppliers.find((x) => x.id === sid); return s ? s.name : (sid != null ? `ID ${sid}` : '—'); };
@@ -450,7 +570,11 @@ export default function EditProduct() {
                                         title: 'Actions',
                                         key: 'actions',
                                         render: (_, r) => (
-                                            <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => setSupplierProductList((prev) => prev.filter((s) => s.id !== r.id))}>Delete</Button>
+                                            <Button type="text" danger size="small" icon={<DeleteOutlined />} loading={savingPriceList} onClick={async () => {
+                                                const newList = supplierProductList.filter((s) => s.id !== r.id);
+                                                setSupplierProductList(newList);
+                                                await saveSupplierProductsToApi(newList);
+                                            }}>Delete</Button>
                                         ),
                                     },
                                 ]}
@@ -458,21 +582,23 @@ export default function EditProduct() {
                         );
                     })()}
                     <Modal title="Add Supplier Price List" open={priceListModalOpen} onCancel={() => setPriceListModalOpen(false)} footer={null} destroyOnClose>
-                        <Form form={priceListForm} layout="vertical" onFinish={(values) => {
+                        <Form form={priceListForm} layout="vertical" onFinish={async (values) => {
                             const caseCost = values.caseCostPrice != null ? Number(values.caseCostPrice) : null;
                             const caseSize = values.caseSize != null ? Number(values.caseSize) : 1;
                             const unitCost = caseCost != null && caseSize > 0 ? (caseCost / caseSize).toFixed(4) : null;
-                            const id = `sp-${Date.now()}`;
-                            setSupplierProductList((prev) => [...prev, {
-                                id,
+                            const newId = `sp-${Date.now()}`;
+                            const newRow = {
+                                id: newId,
                                 supplierId: values.supplierId,
                                 supplierSku: values.supplierSku?.trim() || '',
                                 caseSize,
                                 caseCost,
                                 unitCost,
-                            }]);
+                            };
+                            const newList = [...supplierProductList, newRow];
                             priceListForm.resetFields();
                             setPriceListModalOpen(false);
+                            await saveSupplierProductsToApi(newList);
                         }}>
                             <Form.Item name="supplierId" label="Supplier" rules={[{ required: true, message: 'Required' }]}>
                                 <Select placeholder="Select supplier" className="rounded-lg w-full" allowClear>
@@ -490,7 +616,7 @@ export default function EditProduct() {
                             </Form.Item>
                             <div className="flex justify-end gap-2">
                                 <Button onClick={() => setPriceListModalOpen(false)}>Cancel</Button>
-                                <Button type="primary" htmlType="submit" className="bg-blue-600 border-blue-600">OK</Button>
+                                <Button type="primary" htmlType="submit" className="bg-blue-600 border-blue-600" loading={savingPriceList}>OK</Button>
                             </div>
                         </Form>
                     </Modal>
@@ -499,6 +625,7 @@ export default function EditProduct() {
         },
         {
             key: 'marketplace',
+            forceRender: true,
             label: (
                 <span>
                     <GlobalOutlined /> Marketplace SKUs
@@ -554,6 +681,7 @@ export default function EditProduct() {
         },
         {
             key: 'inventory',
+            forceRender: true,
             label: (
                 <span>
                     <BankOutlined /> Inventory Settings
@@ -603,6 +731,7 @@ export default function EditProduct() {
         },
         {
             key: 'dimensions',
+            forceRender: true,
             label: (
                 <span>
                     <ColumnWidthOutlined /> Dimensions
@@ -647,6 +776,7 @@ export default function EditProduct() {
         },
         {
             key: 'images',
+            forceRender: true,
             label: (
                 <span>
                     <PictureOutlined /> Images

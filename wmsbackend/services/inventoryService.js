@@ -1,6 +1,41 @@
 const { Product, Category, ProductStock, Warehouse, Company, Supplier, InventoryAdjustment, CycleCount, Batch, Movement } = require('../models');
 const { Op } = require('sequelize');
 
+/** Ensure product JSON fields from API are proper objects/arrays (e.g. SQLite may return strings) */
+function normalizeProductJson(p) {
+  if (!p) return p;
+  const out = typeof p.get === 'function' ? p.get({ plain: true }) : { ...p };
+  if (typeof out.cartons === 'string') {
+    try { out.cartons = JSON.parse(out.cartons); } catch (_) { out.cartons = null; }
+  }
+  if (out.cartons != null && !Array.isArray(out.cartons)) out.cartons = null;
+  if (typeof out.supplierProducts === 'string') {
+    try { out.supplierProducts = JSON.parse(out.supplierProducts); } catch (_) { out.supplierProducts = null; }
+  }
+  if (out.supplierProducts != null && !Array.isArray(out.supplierProducts)) out.supplierProducts = null;
+  if (typeof out.marketplaceSkus === 'string') {
+    try { out.marketplaceSkus = JSON.parse(out.marketplaceSkus); } catch (_) { out.marketplaceSkus = {}; }
+  }
+  if (out.marketplaceSkus == null || typeof out.marketplaceSkus !== 'object') out.marketplaceSkus = {};
+  if (Array.isArray(out.marketplaceSkus)) out.marketplaceSkus = {};
+  // Coerce dimension/weight to number so frontend always gets consistent types
+  if (out.length != null && out.length !== '') out.length = Number(out.length);
+  if (out.width != null && out.width !== '') out.width = Number(out.width);
+  if (out.height != null && out.height !== '') out.height = Number(out.height);
+  if (out.weight != null && out.weight !== '') out.weight = Number(out.weight);
+  if (typeof out.images === 'string') {
+    try { out.images = JSON.parse(out.images); } catch (_) { out.images = null; }
+  }
+  if (typeof out.priceLists === 'string') {
+    try { out.priceLists = JSON.parse(out.priceLists); } catch (_) { out.priceLists = null; }
+  }
+  if (typeof out.alternativeSkus === 'string') {
+    try { out.alternativeSkus = JSON.parse(out.alternativeSkus); } catch (_) { out.alternativeSkus = null; }
+  }
+  if (out.alternativeSkus != null && !Array.isArray(out.alternativeSkus)) out.alternativeSkus = null;
+  return out;
+}
+
 async function listProducts(reqUser, query = {}) {
   const where = {};
   if (reqUser.role !== 'super_admin') where.companyId = reqUser.companyId;
@@ -19,6 +54,7 @@ async function listProducts(reqUser, query = {}) {
     include: [
       { association: 'Category', attributes: ['id', 'name', 'code'], required: false },
       { association: 'Company', attributes: ['id', 'name', 'code'], required: false },
+      { association: 'ProductStocks', attributes: ['quantity'], required: false },
     ],
   });
   return products;
@@ -47,12 +83,12 @@ async function getProductById(id, reqUser) {
       { association: 'Category' },
       { association: 'Company', attributes: ['id', 'name', 'code'] },
       { association: 'Supplier', attributes: ['id', 'name', 'code'] },
-      { association: 'ProductStocks', include: ['Warehouse', 'Location'] },
+      { association: 'ProductStocks', include: [{ association: 'Warehouse' }, { association: 'Location' }] },
     ],
   });
   if (!product) throw new Error('Product not found');
   if (reqUser.role !== 'super_admin' && product.companyId !== reqUser.companyId) throw new Error('Product not found');
-  return product;
+  return normalizeProductJson(product);
 }
 
 async function createProduct(data, reqUser) {
@@ -63,7 +99,7 @@ async function createProduct(data, reqUser) {
   if (!companyId) throw new Error('companyId required');
   const existing = await Product.findOne({ where: { companyId, sku: data.sku.trim() } });
   if (existing) throw new Error('SKU already exists for this company');
-  return Product.create({
+  const created = await Product.create({
     companyId,
     categoryId: data.categoryId || null,
     supplierId: data.supplierId || null,
@@ -94,11 +130,12 @@ async function createProduct(data, reqUser) {
     maxStock: data.maxStock != null ? data.maxStock : null,
     status: data.status || 'ACTIVE',
     images: Array.isArray(data.images) ? data.images : null,
-    cartons: data.cartons && typeof data.cartons === 'object' ? data.cartons : null,
+    cartons: Array.isArray(data.cartons) ? data.cartons : (data.cartons && typeof data.cartons === 'object' ? data.cartons : null),
     priceLists: data.priceLists && typeof data.priceLists === 'object' ? data.priceLists : null,
     supplierProducts: Array.isArray(data.supplierProducts) ? data.supplierProducts : null,
     alternativeSkus: Array.isArray(data.alternativeSkus) ? data.alternativeSkus : null,
   });
+  return normalizeProductJson(created);
 }
 
 async function bulkCreateProducts(productsArray, reqUser) {
@@ -156,7 +193,7 @@ async function bulkCreateProducts(productsArray, reqUser) {
         maxStock: data.maxStock != null ? Number(data.maxStock) : null,
         status: data.status && String(data.status).toUpperCase() === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
         images: null,
-        cartons: null,
+        cartons: Array.isArray(data.cartons) && data.cartons.length > 0 ? data.cartons : null,
         priceLists: null,
         supplierProducts: null,
         alternativeSkus: null,
@@ -174,43 +211,88 @@ async function updateProduct(id, data, reqUser) {
   const product = await Product.findByPk(id);
   if (!product) throw new Error('Product not found');
   if (reqUser.role !== 'super_admin' && product.companyId !== reqUser.companyId) throw new Error('Product not found');
-  const upd = {
-    name: data.name ?? product.name,
-    categoryId: data.categoryId !== undefined ? data.categoryId : product.categoryId,
-    supplierId: data.supplierId !== undefined ? data.supplierId : product.supplierId,
-    sku: data.sku?.trim() ?? product.sku,
-    barcode: data.barcode !== undefined ? data.barcode : product.barcode,
-    description: data.description !== undefined ? data.description : product.description,
-    productType: data.productType !== undefined ? data.productType : product.productType,
-    unitOfMeasure: data.unitOfMeasure !== undefined ? data.unitOfMeasure : product.unitOfMeasure,
-    price: data.price !== undefined ? data.price : product.price,
-    costPrice: data.costPrice !== undefined ? data.costPrice : product.costPrice,
-    vatRate: data.vatRate !== undefined ? data.vatRate : product.vatRate,
-    vatCode: data.vatCode !== undefined ? data.vatCode : product.vatCode,
-    customsTariff: data.customsTariff !== undefined ? (data.customsTariff != null ? String(data.customsTariff) : null) : product.customsTariff,
-    marketplaceSkus: data.marketplaceSkus !== undefined ? (data.marketplaceSkus && typeof data.marketplaceSkus === 'object' ? data.marketplaceSkus : product.marketplaceSkus) : product.marketplaceSkus,
-    heatSensitive: data.heatSensitive !== undefined ? data.heatSensitive : product.heatSensitive,
-    perishable: data.perishable !== undefined ? data.perishable : product.perishable,
-    requireBatchTracking: data.requireBatchTracking !== undefined ? data.requireBatchTracking : product.requireBatchTracking,
-    shelfLifeDays: data.shelfLifeDays !== undefined ? data.shelfLifeDays : product.shelfLifeDays,
-    length: data.length !== undefined ? data.length : product.length,
-    width: data.width !== undefined ? data.width : product.width,
-    height: data.height !== undefined ? data.height : product.height,
-    dimensionUnit: data.dimensionUnit !== undefined ? data.dimensionUnit : product.dimensionUnit,
-    weight: data.weight !== undefined ? data.weight : product.weight,
-    weightUnit: data.weightUnit !== undefined ? data.weightUnit : product.weightUnit,
-    reorderLevel: data.reorderLevel !== undefined ? data.reorderLevel : product.reorderLevel,
-    reorderQty: data.reorderQty !== undefined ? data.reorderQty : product.reorderQty,
-    maxStock: data.maxStock !== undefined ? data.maxStock : product.maxStock,
-    status: data.status ?? product.status,
-    images: data.images !== undefined ? (Array.isArray(data.images) ? data.images : product.images) : product.images,
-    cartons: data.cartons !== undefined ? (data.cartons && typeof data.cartons === 'object' ? data.cartons : product.cartons) : product.cartons,
-    priceLists: data.priceLists !== undefined ? (data.priceLists && typeof data.priceLists === 'object' ? data.priceLists : product.priceLists) : product.priceLists,
-    supplierProducts: data.supplierProducts !== undefined ? (Array.isArray(data.supplierProducts) ? data.supplierProducts : product.supplierProducts) : product.supplierProducts,
-    alternativeSkus: data.alternativeSkus !== undefined ? (Array.isArray(data.alternativeSkus) ? data.alternativeSkus : product.alternativeSkus) : product.alternativeSkus,
-  };
+  // Only update fields that are present in data (partial update) – baki data null nahi hoga
+  const upd = {};
+  if (data.name !== undefined) upd.name = data.name ?? product.name;
+  if (data.categoryId !== undefined) upd.categoryId = data.categoryId;
+  if (data.supplierId !== undefined) upd.supplierId = data.supplierId;
+  if (data.sku !== undefined) upd.sku = data.sku?.trim() ?? product.sku;
+  if (data.barcode !== undefined) upd.barcode = data.barcode;
+  if (data.description !== undefined) upd.description = data.description;
+  if (data.productType !== undefined) upd.productType = data.productType;
+  if (data.unitOfMeasure !== undefined) upd.unitOfMeasure = data.unitOfMeasure;
+  if (data.price !== undefined) upd.price = data.price;
+  if (data.costPrice !== undefined) upd.costPrice = data.costPrice;
+  if (data.vatRate !== undefined) upd.vatRate = data.vatRate;
+  if (data.vatCode !== undefined) upd.vatCode = data.vatCode;
+  if (data.customsTariff !== undefined) upd.customsTariff = data.customsTariff != null ? String(data.customsTariff) : null;
+  if (data.marketplaceSkus !== undefined) upd.marketplaceSkus = data.marketplaceSkus && typeof data.marketplaceSkus === 'object' ? data.marketplaceSkus : product.marketplaceSkus;
+  if (data.heatSensitive !== undefined) upd.heatSensitive = data.heatSensitive;
+  if (data.perishable !== undefined) upd.perishable = data.perishable;
+  if (data.requireBatchTracking !== undefined) upd.requireBatchTracking = data.requireBatchTracking;
+  if (data.shelfLifeDays !== undefined) upd.shelfLifeDays = data.shelfLifeDays;
+  if (data.length !== undefined) upd.length = data.length;
+  if (data.width !== undefined) upd.width = data.width;
+  if (data.height !== undefined) upd.height = data.height;
+  if (data.dimensionUnit !== undefined) upd.dimensionUnit = data.dimensionUnit;
+  if (data.weight !== undefined) upd.weight = data.weight;
+  if (data.weightUnit !== undefined) upd.weightUnit = data.weightUnit;
+  if (data.reorderLevel !== undefined) upd.reorderLevel = data.reorderLevel;
+  if (data.reorderQty !== undefined) upd.reorderQty = data.reorderQty;
+  if (data.maxStock !== undefined) upd.maxStock = data.maxStock;
+  if (data.status !== undefined) upd.status = data.status ?? product.status;
+  if (data.images !== undefined) upd.images = Array.isArray(data.images) ? data.images : product.images;
+  if (data.cartons !== undefined) upd.cartons = Array.isArray(data.cartons) ? data.cartons : (data.cartons && typeof data.cartons === 'object' ? data.cartons : product.cartons);
+  if (data.priceLists !== undefined) upd.priceLists = data.priceLists && typeof data.priceLists === 'object' ? data.priceLists : product.priceLists;
+  if (data.supplierProducts !== undefined) upd.supplierProducts = Array.isArray(data.supplierProducts) ? data.supplierProducts : product.supplierProducts;
+  if (data.alternativeSkus !== undefined) upd.alternativeSkus = Array.isArray(data.alternativeSkus) ? data.alternativeSkus : product.alternativeSkus;
+  if (Object.keys(upd).length === 0) return normalizeProductJson(product);
   await product.update(upd);
-  return product;
+  const updated = await Product.findByPk(id, {
+    include: [
+      { association: 'Category' },
+      { association: 'Company', attributes: ['id', 'name', 'code'] },
+      { association: 'Supplier', attributes: ['id', 'name', 'code'] },
+      { association: 'ProductStocks', include: [{ association: 'Warehouse' }, { association: 'Location' }] },
+    ],
+  });
+  return normalizeProductJson(updated || product);
+}
+
+async function addAlternativeSku(productId, payload, reqUser) {
+  const product = await Product.findByPk(productId, {
+    include: [
+      { association: 'Category' },
+      { association: 'Company', attributes: ['id', 'name', 'code'] },
+      { association: 'Supplier', attributes: ['id', 'name', 'code'] },
+      { association: 'ProductStocks', include: [{ association: 'Warehouse' }, { association: 'Location' }] },
+    ],
+  });
+  if (!product) throw new Error('Product not found');
+  if (reqUser.role !== 'super_admin' && product.companyId !== reqUser.companyId) throw new Error('Product not found');
+  const list = Array.isArray(product.alternativeSkus) ? [...product.alternativeSkus] : [];
+  const newItem = {
+    id: payload.id || `alt-${Date.now()}`,
+    channelType: payload.channelType || null,
+    sku: payload.sku?.trim() || null,
+    skuType: payload.skuType || null,
+    isPrimary: !!payload.isPrimary,
+    active: payload.active !== false,
+    notes: payload.notes?.trim() || null,
+    leadTimeDays: payload.leadTimeDays != null ? payload.leadTimeDays : null,
+    moq: payload.moq != null ? payload.moq : null,
+  };
+  list.push(newItem);
+  await product.update({ alternativeSkus: list });
+  const updated = await Product.findByPk(productId, {
+    include: [
+      { association: 'Category' },
+      { association: 'Company', attributes: ['id', 'name', 'code'] },
+      { association: 'Supplier', attributes: ['id', 'name', 'code'] },
+      { association: 'ProductStocks', include: [{ association: 'Warehouse' }, { association: 'Location' }] },
+    ],
+  });
+  return normalizeProductJson(updated || product);
 }
 
 async function removeProduct(id, reqUser) {
@@ -383,7 +465,7 @@ async function listStockByLocation(reqUser, query = {}) {
       byLoc[locId] = {
         locationId: locId || null,
         locationName: loc?.name || 'Unassigned',
-        locationCode: loc?.code || '—',
+        locationCode: loc?.code || loc?.name || '',
         locationType: loc?.locationType || '—',
         zoneName: loc?.Zone?.name || loc?.Zone?.code || '—',
         properties: loc?.heatSensitive === 'yes' ? 'Hot Location' : (loc?.heatSensitive ? String(loc.heatSensitive) : '—'),
@@ -410,7 +492,8 @@ function generateAdjustmentReference() {
 
 async function listAdjustments(reqUser, query = {}) {
   const where = {};
-  if (reqUser.role !== 'super_admin') where.companyId = reqUser.companyId;
+  const role = (reqUser.role || '').toString().toLowerCase().replace(/-/g, '_');
+  if (role !== 'super_admin' && reqUser.companyId) where.companyId = reqUser.companyId;
   if (query.type) where.type = query.type;
   if (query.status) where.status = query.status;
   if (query.search) {
@@ -439,14 +522,17 @@ async function listAdjustments(reqUser, query = {}) {
 }
 
 async function createAdjustment(data, reqUser) {
-  if (reqUser.role !== 'super_admin' && reqUser.role !== 'company_admin' && reqUser.role !== 'inventory_manager') {
+  const role = (reqUser.role || '').toString().toLowerCase().replace(/-/g, '_');
+  if (role !== 'super_admin' && role !== 'company_admin' && role !== 'inventory_manager') {
     throw new Error('Not allowed to create adjustment');
   }
   const companyId = reqUser.companyId || data.companyId;
-  if (!companyId) throw new Error('Company context required');
+  if (!companyId && role !== 'super_admin') throw new Error('Company context required');
+  const effectiveCompanyId = companyId || (await Product.findByPk(data.productId).then(p => p?.companyId));
+  if (!effectiveCompanyId) throw new Error('Company context required');
   const product = await Product.findByPk(data.productId);
   if (!product) throw new Error('Product not found');
-  if (product.companyId !== companyId && reqUser.role !== 'super_admin') throw new Error('Product not found');
+  if (effectiveCompanyId && product.companyId !== effectiveCompanyId && role !== 'super_admin') throw new Error('Product not found');
   const qty = Math.abs(parseInt(data.quantity, 10) || 0);
   if (qty < 1) throw new Error('Quantity must be at least 1');
   const type = (data.type || '').toUpperCase() === 'DECREASE' ? 'DECREASE' : 'INCREASE';
@@ -464,7 +550,7 @@ async function createAdjustment(data, reqUser) {
   }
   const adjustment = await InventoryAdjustment.create({
     referenceNumber,
-    companyId,
+    companyId: effectiveCompanyId,
     productId: data.productId,
     warehouseId: warehouseId || (stock && stock.warehouseId) || null,
     type,
@@ -480,7 +566,7 @@ async function createAdjustment(data, reqUser) {
   } else if (type === 'INCREASE') {
     if (!warehouseId) {
       const { Warehouse } = require('../models');
-      const firstWarehouse = await Warehouse.findOne({ where: { companyId } });
+      const firstWarehouse = await Warehouse.findOne({ where: { companyId: effectiveCompanyId } });
       if (!firstWarehouse) throw new Error('No warehouse found for company');
       warehouseId = firstWarehouse.id;
       await ProductStock.create({
@@ -766,6 +852,7 @@ module.exports = {
   createProduct,
   bulkCreateProducts,
   updateProduct,
+  addAlternativeSku,
   removeProduct,
   createCategory,
   updateCategory,

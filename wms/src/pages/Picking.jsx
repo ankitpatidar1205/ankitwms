@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Button, Tag, Card, Space, Statistic, Row, Col, Modal, Form, Input, Select, InputNumber, Drawer, Tabs, Progress, message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ClockCircleOutlined, SyncOutlined, CheckCircleOutlined, InboxOutlined, MinusCircleOutlined, SearchOutlined, ReloadOutlined, FireOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { MainLayout } from '../components/layout/MainLayout';
@@ -183,10 +183,10 @@ export default function Picking() {
     };
 
     const columns = [
-        { title: 'Pick List', key: 'pn', render: (_, r) => <Link to={`/picking/${r.id}`} className="font-black text-indigo-600 italic tracking-tighter">PL-{String(r.id).slice(0, 8)}</Link> },
+        { title: 'Pick List', key: 'pn', render: (_, r) => <Link to={`/picking/${r.id}`} className="font-semibold text-blue-600 hover:underline">PL-{String(r.id).slice(0, 8)}</Link> },
         { title: 'Order', key: 'order', render: (_, r) => shortenOrderNumber(r.SalesOrder?.orderNumber || r.salesOrderId) },
-        { title: 'Assigned To', key: 'picker', render: (_, r) => r.User?.name ? <Tag color="purple" className="font-bold">{r.User.name}</Tag> : <span className="text-gray-400 italic text-xs">Unassigned</span> },
-        { title: 'Strategy', dataIndex: 'type', key: 'type', render: (t) => <Tag color="blue" className="font-bold">{t || 'SINGLE'}</Tag> },
+        { title: 'Assigned To', key: 'picker', render: (_, r) => r.User?.name ? <Tag color="blue">{r.User.name}</Tag> : <span className="text-gray-400 text-xs">Unassigned</span> },
+        { title: 'Strategy', dataIndex: 'type', key: 'type', render: (t) => <Tag color="default">{t || 'SINGLE'}</Tag> },
         {
             title: 'Fulfillment', key: 'fulfill', render: (_, r) => {
                 const items = r.PickListItems || r.pickItems || [];
@@ -195,8 +195,8 @@ export default function Picking() {
                 return <div className="w-24"><Progress percent={Math.round((picked / req) * 100)} size="small" strokeColor="#6366f1" /></div>;
             }
         },
-        { title: 'Urgency', dataIndex: 'priority', key: 'prio', render: (p) => <Tag color={p === 'HIGH' ? 'red' : 'orange'} className="font-heavy uppercase">{p}</Tag> },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={s === 'PICKED' ? 'green' : 'blue'} className="uppercase font-extrabold">{s}</Tag> },
+        { title: 'Urgency', dataIndex: 'priority', key: 'prio', render: (p) => <Tag color={p === 'HIGH' ? 'red' : 'default'}>{p || 'MEDIUM'}</Tag> },
+        { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={s === 'PICKED' ? 'green' : 'blue'}>{s}</Tag> },
         {
             title: 'Action',
             key: 'act',
@@ -212,26 +212,30 @@ export default function Picking() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Picking</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Coordinate pick-and-pack missions across the floor</p>
-                    </div>
-                    <Button type="primary" icon={<FireOutlined />} size="large" className="h-14 px-8 rounded-2xl bg-indigo-600 border-indigo-600 shadow-xl shadow-indigo-100" onClick={() => setModalOpen(true)}>
-                        Spawn Pick Task
-                    </Button>
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Pick Lists</h1>
+                    <p className="text-gray-500 text-sm mt-1">Coordinate pick-and-pack tasks across the floor</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card className="rounded-2xl border-none shadow-sm bg-slate-900 text-white"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Live Queue</div><div className="text-3xl font-black">{pickLists.filter(x => (x.status || '').toUpperCase() !== 'PICKED').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Dispatched</div><div className="text-3xl font-black">{pickLists.filter(x => (x.status || '').toUpperCase() === 'PICKED').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Units Picked</div><div className="text-3xl font-black">{pickLists.reduce((s, p) => s + ((p.PickListItems || p.pickItems || []).reduce((ss, i) => ss + (i.quantityPicked || 0), 0) || 0), 0)}</div></Card>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-slate-600 text-xs font-medium mb-1">Live Queue</div>
+                        <div className="text-xl font-bold text-slate-800">{pickLists.filter(x => (x.status || '').toUpperCase() !== 'PICKED').length}</div>
+                    </Card>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-green-600 text-xs font-medium mb-1">Dispatched</div>
+                        <div className="text-xl font-bold text-slate-800">{pickLists.filter(x => (x.status || '').toUpperCase() === 'PICKED').length}</div>
+                    </Card>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-blue-600 text-xs font-medium mb-1">Units Picked</div>
+                        <div className="text-xl font-bold text-slate-800">{pickLists.reduce((s, p) => s + ((p.PickListItems || p.pickItems || []).reduce((ss, i) => ss + (i.quantityPicked || 0), 0) || 0), 0)}</div>
+                    </Card>
                 </div>
 
-                <Card className="rounded-3xl shadow-sm border-gray-100 overflow-hidden">
-                    <div className="mb-6 p-2 bg-slate-50 rounded-2xl flex items-center gap-4">
-                        <Search placeholder="ID, Ticket or Order Ref..." className="max-w-xs h-12 shadow-sm" prefix={<SearchOutlined />} />
+                <Card className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="p-4 bg-gray-50/80 border-b border-gray-100 flex flex-wrap items-center gap-3">
+                        <Search placeholder="ID, ticket or order ref..." className="max-w-xs" prefix={<SearchOutlined />} allowClear />
                         <Tabs
                             activeKey={activeTab}
                             onChange={setActiveTab}
@@ -240,11 +244,11 @@ export default function Picking() {
                                 ...(user?.role !== 'picker' ? [{ key: 'ASSIGNED', label: 'Assigned' }] : []),
                                 { key: 'PARTIALLY_PICKED', label: 'In Progress' }
                             ]}
-                            className="pick-tabs flex-1"
+                            className="min-w-0"
                         />
-                        <Button icon={<ReloadOutlined />} onClick={fetchPickLists} />
+                        <Button icon={<ReloadOutlined />} onClick={fetchPickLists}>Refresh</Button>
                     </div>
-                    <Table columns={columns} dataSource={filteredPickLists} rowKey="id" loading={loading} />
+                    <Table columns={columns} dataSource={filteredPickLists} rowKey="id" loading={loading} className="px-4" />
                 </Card>
 
                 <Modal title="Generate Fulfillment Directive" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} width={700} className="generation-modal">

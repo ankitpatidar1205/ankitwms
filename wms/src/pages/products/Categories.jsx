@@ -121,7 +121,7 @@ export default function Categories() {
                         <p className="text-gray-500 text-sm mt-0.5">Hierarchical classification and categorization of warehouse inventory</p>
                     </div>
                     <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setSelectedCategory(null); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
-                        + Add Category
+                        Add Category
                     </Button>
                 </div>
 

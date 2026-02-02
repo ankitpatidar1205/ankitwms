@@ -46,7 +46,7 @@ async function remove(req, res, next) {
     res.json({ success: true, ...data });
   } catch (err) {
     if (err.message === 'Order not found') return res.status(404).json({ success: false, message: err.message });
-    if (err.message?.includes('Only pending')) return res.status(400).json({ success: false, message: err.message });
+    if (err.message?.includes('cannot be deleted') || err.message?.includes('can be deleted')) return res.status(400).json({ success: false, message: err.message });
     next(err);
   }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Form, Input, Select, InputNumber, Button, message, Upload, Row, Col } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../../components/layout/MainLayout';
@@ -125,14 +125,16 @@ export default function AddProduct() {
                 maxStock: values.maxStock != null ? values.maxStock : null,
                 status: values.status || 'ACTIVE',
                 images: imageList.map((i) => i.url),
-                cartons: null,
+                cartons: [],
+                supplierProducts: [],
                 priceLists: null,
             };
             const res = await apiRequest('/api/inventory/products', { method: 'POST', body: JSON.stringify(payload) }, token);
+            const created = res?.data ?? res;
             message.success('Product created successfully!');
             form.resetFields();
             setImageList([]);
-            navigate('/products');
+            navigate('/products', { replace: true });
         } catch (err) {
             message.error(err?.data?.message || err?.message || 'Failed to create product');
         } finally {
@@ -167,7 +169,7 @@ export default function AddProduct() {
 
     return (
         <MainLayout>
-            <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 animate-in fade-in duration-500 pb-12">
                 <div className="flex items-center gap-4">
                     <Link to="/products" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium">
                         <ArrowLeftOutlined /> Back
@@ -410,7 +412,6 @@ export default function AddProduct() {
                         <p className="text-gray-500 text-sm mb-4">Upload Images. Supports JPG, PNG, GIF, WebP. Max {MAX_IMAGES} images, {MAX_FILE_SIZE_MB}MB each.</p>
                         <Upload accept={ACCEPT_IMAGES} multiple showUploadList={false} customRequest={handleUpload} listType="picture-card">
                             <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 transition-colors">
-                                <PlusOutlined className="text-3xl text-gray-400 mb-2" />
                                 <span className="text-sm text-gray-600">Upload</span>
                                 <span className="text-xs text-gray-400 mt-1">{imageList.length} / {MAX_IMAGES} images</span>
                             </div>

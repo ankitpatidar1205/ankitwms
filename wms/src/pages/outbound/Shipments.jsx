@@ -10,6 +10,22 @@ import { formatDate } from '../../utils';
 const { Search } = Input;
 const { Option } = Select;
 
+function deliveryStatusLabel(s) {
+    const u = (s || '').toUpperCase();
+    if (u === 'DELIVERED') return 'Delivered';
+    if (u === 'SHIPPED' || u === 'IN_TRANSIT') return u === 'IN_TRANSIT' ? 'In Transit' : 'Shipped';
+    if (u === 'READY_TO_SHIP') return 'Ready to Ship';
+    return s || '—';
+}
+
+function deliveryStatusColor(s) {
+    const u = (s || '').toUpperCase();
+    if (u === 'DELIVERED') return 'green';
+    if (u === 'SHIPPED' || u === 'IN_TRANSIT') return 'blue';
+    if (u === 'READY_TO_SHIP') return 'orange';
+    return 'default';
+}
+
 export default function Shipments() {
     const navigate = useNavigate();
     const { token } = useAuthStore();
@@ -24,12 +40,37 @@ export default function Shipments() {
     const fetchReadyOrders = useCallback(async () => {
         if (!token) return;
         try {
-            const data = await apiRequest('/api/orders/sales?status=PACKED', { method: 'GET' }, token);
-            setReadyOrders(Array.isArray(data?.data) ? data.data : []);
+            const [ordersRes, shipmentsRes] = await Promise.all([
+                apiRequest('/api/orders/sales?status=PACKED', { method: 'GET' }, token),
+                apiRequest('/api/shipments', { method: 'GET' }, token),
+            ]);
+            const packedList = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+            const allShipments = Array.isArray(shipmentsRes?.data) ? shipmentsRes.data : (shipmentsRes?.data && !Array.isArray(shipmentsRes.data) ? [] : []);
+            const readyToShipShipments = allShipments.filter((s) => (s.deliveryStatus || '').toUpperCase() === 'READY_TO_SHIP' && s.SalesOrder);
+            const seenOrderIds = new Set(packedList.map((o) => o.id));
+            const merged = [...packedList];
+            readyToShipShipments.forEach((ship) => {
+                const order = ship.SalesOrder;
+                if (!order || !order.id) return;
+                if (seenOrderIds.has(order.id)) {
+                    const idx = merged.findIndex((o) => o.id === order.id);
+                    if (idx >= 0 && !merged[idx].Shipment) merged[idx] = { ...merged[idx], Shipment: ship };
+                    return;
+                }
+                seenOrderIds.add(order.id);
+                merged.push({ ...order, Shipment: ship });
+            });
+            setReadyOrders(merged);
         } catch (_) {
             setReadyOrders([]);
         }
     }, [token]);
+
+    const isOrderShipped = (o) => {
+        const st = (o?.Shipment?.deliveryStatus || '').toUpperCase();
+        return ['SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes(st);
+    };
+    const ordersAvailableForDispatch = readyOrders.filter((o) => !o.Shipment || !isOrderShipped(o));
 
     const fetchShipments = useCallback(async () => {
         if (!token) return;
@@ -60,15 +101,22 @@ export default function Shipments() {
         }
         try {
             for (const orderId of selectedOrderIds) {
-                await apiRequest('/api/shipments', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        salesOrderId: orderId,
-                        courierName: values.carrier,
-                        // serviceType: values.serviceType, // Not in model, maybe put in notes? or ignore
-                        // notes: values.notes
-                    })
-                }, token);
+                const order = readyOrders.find((o) => o.id === orderId);
+                const existingShipment = order?.Shipment && !isOrderShipped(order) ? order.Shipment : null;
+                if (existingShipment?.id) {
+                    await apiRequest(`/api/shipments/${existingShipment.id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ courierName: values.carrier }),
+                    }, token);
+                } else {
+                    await apiRequest('/api/shipments', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            salesOrderId: orderId,
+                            courierName: values.carrier,
+                        }),
+                    }, token);
+                }
             }
             message.success('Dispatch Manifest Generated');
             setBatchModalOpen(false);
@@ -105,18 +153,20 @@ export default function Shipments() {
         message.success('Label sent to printer');
     };
     const columns = [
-        { title: 'Shipment ID', dataIndex: 'id', key: 'sn', render: (v, r) => <a onClick={() => handleViewClick(r)} className="font-bold text-teal-600 underline">SHI-{String(v).padStart(3, '0')}</a> },
-        { title: 'Courier', dataIndex: 'courierName', key: 'carrier', render: (v) => <Tag color="orange" className="font-bold uppercase text-[10px]">{v || '—'}</Tag> },
-        { title: 'Tracking', dataIndex: 'trackingNumber', key: 'track', render: (v) => <span className="font-mono text-xs text-slate-500">{v || 'PENDING'}</span> },
-        { title: 'Status', dataIndex: 'deliveryStatus', key: 'status', render: (s) => <Tag color={['DELIVERED'].includes((s || '').toUpperCase()) ? 'green' : 'blue'} className="uppercase font-black border-none">{s || 'READY_TO_SHIP'}</Tag> },
-        { title: 'Dispatch Date', dataIndex: 'dispatchDate', key: 'date', render: (v) => formatDate(v) },
+        { title: 'Shipment ID', dataIndex: 'id', key: 'sn', render: (v, r) => <a onClick={() => handleViewClick(r)} className="font-semibold text-blue-600 hover:underline cursor-pointer">SHI-{String(v).padStart(3, '0')}</a> },
+        { title: 'Order', key: 'order', render: (_, r) => <span className="text-slate-600">{shortenOrderNumber(r?.SalesOrder?.orderNumber) || '—'}</span> },
+        { title: 'Courier', dataIndex: 'courierName', key: 'carrier', render: (v) => <span>{v || '—'}</span> },
+        { title: 'Tracking', dataIndex: 'trackingNumber', key: 'track', render: (v) => <span className="font-mono text-xs text-slate-500">{v || '—'}</span> },
+        { title: 'Destination Postcode', key: 'postcode', render: (_, r) => <span className="font-mono text-slate-600">{r?.SalesOrder?.Customer?.postcode || '—'}</span> },
+        { title: 'Status', dataIndex: 'deliveryStatus', key: 'status', render: (s) => <Tag color={deliveryStatusColor(s)}>{deliveryStatusLabel(s)}</Tag> },
+        { title: 'Dispatch Date', dataIndex: 'dispatchDate', key: 'date', render: (v) => formatDate(v) || '—' },
         {
-            title: 'Action',
+            title: 'Actions',
             key: 'act',
             render: (_, r) => (
-                <Space>
-                    <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewClick(r)} />
-                    <Button type="text" icon={<PrinterOutlined className="text-teal-500" />} onClick={() => handlePrint(r)} />
+                <Space size="small">
+                    <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewClick(r)} title="View" />
+                    <Button type="text" icon={<PrinterOutlined className="text-blue-500" />} onClick={() => handlePrint(r)} title="Print" />
                 </Space>
             )
         }
@@ -124,35 +174,45 @@ export default function Shipments() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-                <div className="flex justify-between items-center">
+            <div className="space-y-8 pb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Shipments</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Real-time global logistics oversight and carrier manifest management</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Shipments</h1>
+                        <p className="text-gray-500 text-sm mt-1">Logistics oversight and carrier manifest management</p>
                     </div>
-                    <Space size="middle">
-                        <Button icon={<SettingOutlined />} className="h-12 rounded-xl">Carrier APIs</Button>
-                        <Button type="primary" icon={<PlusOutlined />} size="large" className="h-14 px-8 rounded-2xl bg-teal-600 border-teal-600 shadow-2xl shadow-teal-100 font-bold" onClick={() => setBatchModalOpen(true)}>
-                            Execute Batch Dispatch
+                    <Space size="middle" wrap>
+                        <Button icon={<SettingOutlined />} className="rounded-xl">Carrier APIs</Button>
+                        <Button type="primary" icon={<PlusOutlined />} className="rounded-xl" onClick={() => setBatchModalOpen(true)}>
+                            Batch Dispatch
                         </Button>
                     </Space>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">In Transit</div><div className="text-3xl font-black">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'IN_TRANSIT').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-green-500 uppercase mb-1">Delivered (24h)</div><div className="text-3xl font-black">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'DELIVERED').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-orange-500 uppercase mb-1">Awaiting Pickup</div><div className="text-3xl font-black">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'READY_TO_SHIP').length}</div></Card>
-                    <Card className="rounded-3xl border-none shadow-sm"><div className="text-[10px] font-black text-indigo-500 uppercase mb-1">Global Coverage</div><div className="text-3xl font-black">98.4%</div></Card>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-blue-600 text-xs font-medium mb-1">In Transit</div>
+                        <div className="text-xl font-bold text-slate-800">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'IN_TRANSIT').length}</div>
+                    </Card>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-green-600 text-xs font-medium mb-1">Delivered</div>
+                        <div className="text-xl font-bold text-slate-800">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'DELIVERED').length}</div>
+                    </Card>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-orange-500 text-xs font-medium mb-1">Awaiting Pickup</div>
+                        <div className="text-xl font-bold text-slate-800">{shipments.filter(x => (x.deliveryStatus || '').toUpperCase() === 'READY_TO_SHIP').length}</div>
+                    </Card>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-slate-600 text-xs font-medium mb-1">Total</div>
+                        <div className="text-xl font-bold text-slate-800">{shipments.length}</div>
+                    </Card>
                 </div>
 
-                <Card className="rounded-[2.5rem] shadow-sm border-gray-100 overflow-hidden">
-                    <div className="p-8">
-                        <div className="mb-8 flex items-center justify-between">
-                            <Search placeholder="Identity Search (Waybill, Tracking, Postcode)..." className="max-w-md h-12 shadow-sm rounded-xl" prefix={<SearchOutlined />} />
-                            <Button icon={<ReloadOutlined />} onClick={fetchShipments} />
-                        </div>
-                        <Table columns={columns} dataSource={shipments} rowKey="id" loading={loading} />
+                <Card className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="p-4 bg-gray-50/80 border-b border-gray-100 flex flex-wrap items-center gap-3">
+                        <Search placeholder="Search by waybill, tracking or postcode..." className="max-w-md" prefix={<SearchOutlined />} allowClear />
+                        <Button icon={<ReloadOutlined />} onClick={fetchShipments}>Refresh</Button>
                     </div>
+                    <Table columns={columns} dataSource={shipments} rowKey="id" loading={loading} className="px-4" />
                 </Card>
 
                 <Modal title="Generate Batch Dispatch Manifest" open={batchModalOpen} onCancel={() => setBatchModalOpen(false)} onOk={() => batchForm.submit()} width={1000} className="dispatch-modal">
@@ -163,14 +223,62 @@ export default function Shipments() {
                             <Form.Item label="Operational Notes" name="notes"><Input placeholder="Gate 4 pickup" className="h-11 rounded-xl" /></Form.Item>
                         </div>
                         <div className="mb-4 flex items-center justify-between">
-                            <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest">Ready for Dispatch ({readyOrders.length})</h4>
-                            <span className="text-[10px] font-bold text-gray-400 capitalize underline cursor-pointer" onClick={() => setSelectedOrderIds(readyOrders.map(o => o.id))}>Select All Items</span>
+                            <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest">Ready for Dispatch ({readyOrders.length}) {ordersAvailableForDispatch.length < readyOrders.length && <span className="text-gray-500 font-normal normal-case">— {ordersAvailableForDispatch.length} selectable</span>}</h4>
+                            {ordersAvailableForDispatch.length > 0 && <span className="text-[10px] font-bold text-gray-400 capitalize underline cursor-pointer" onClick={() => setSelectedOrderIds(ordersAvailableForDispatch.map(o => o.id))}>Select All (selectable only)</span>}
                         </div>
-                        <Table className="ready-table" pagination={false} scroll={{ y: 300 }} rowSelection={{ selectedRowKeys: selectedOrderIds, onChange: setSelectedOrderIds }} dataSource={readyOrders} rowKey="id" columns={[
-                            { title: 'Order', dataIndex: 'orderNumber', render: (v) => <b className="text-indigo-600">{shortenOrderNumber(v)}</b> },
-                            { title: 'Customer', dataIndex: ['Customer', 'name'] },
-                            { title: 'Destination Postcode', dataIndex: 'postcode' },
-                            { title: 'Package Weight', dataIndex: 'weight', render: (v) => `${v || 0} kg` }
+                        <Table
+                            className="ready-table"
+                            pagination={false}
+                            scroll={{ y: 320 }}
+                            locale={{ emptyText: 'No PACKED orders. Pack orders from Sales Orders first.' }}
+                            rowSelection={{
+                                selectedRowKeys: selectedOrderIds,
+                                onChange: setSelectedOrderIds,
+                                getCheckboxProps: (record) => ({ disabled: isOrderShipped(record) }),
+                            }}
+                            dataSource={readyOrders}
+                            rowKey="id"
+                            rowClassName={(record) => (isOrderShipped(record) ? 'opacity-70 bg-gray-50' : '')}
+                            columns={[
+                            { title: 'Order', dataIndex: 'orderNumber', render: (v, r) => {
+                                if (!r.Shipment) return <b className="text-indigo-600">{shortenOrderNumber(v) || '—'}</b>;
+                                const st = (r.Shipment.deliveryStatus || '').toUpperCase();
+                                const isShipped = ['SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes(st);
+                                return <span><b className="text-indigo-600">{shortenOrderNumber(v) || '—'}</b><Tag color={isShipped ? 'default' : 'orange'} className="ml-2 text-xs">{isShipped ? 'Already dispatched' : 'Ready to Ship'}</Tag></span>;
+                            }},
+                            { title: 'Customer', render: (_, r) => r?.Customer?.name || '—' },
+                            { title: 'Destination', render: (_, r) => {
+                                const c = r?.Customer;
+                                if (!c) return '—';
+                                const addr = c.address || [c.city, c.state, c.country].filter(Boolean).join(', ');
+                                const pc = c.postcode ?? c.post_code ?? '';
+                                const postcode = pc ? `, ${pc}` : '';
+                                return (addr ? addr + postcode : (pc || '—')).trim() || '—';
+                            }},
+                            { title: 'Postcode', key: 'postcode', render: (_, r) => {
+                                const c = r?.Customer;
+                                const pc = c?.postcode ?? c?.post_code ?? '';
+                                const display = pc || '—';
+                                return display === '—' ? (
+                                    <Tooltip title="Add postcode in Customers → Edit customer">
+                                        <span className="font-mono text-slate-400">{display}</span>
+                                    </Tooltip>
+                                ) : (
+                                    <span className="font-mono text-slate-600">{display}</span>
+                                );
+                            }},
+                            { title: 'Package Weight', render: (_, r) => {
+                                const items = r?.OrderItems || [];
+                                let total = 0;
+                                let unit = 'kg';
+                                items.forEach((oi) => {
+                                    const qty = Number(oi.quantity) || 0;
+                                    const w = Number(oi.Product?.weight) || 0;
+                                    total += qty * w;
+                                    if (oi.Product?.weightUnit) unit = oi.Product.weightUnit;
+                                });
+                                return total > 0 ? `${total} ${unit}` : '—';
+                            }}
                         ]} />
                     </Form>
                 </Modal>
@@ -205,41 +313,90 @@ export default function Shipments() {
                     )}
                 </Modal>
 
-                <Modal title="Shipment Details" open={viewModalOpen} onCancel={() => setViewModalOpen(false)} footer={<Button onClick={() => setViewModalOpen(false)}>Close</Button>} width={600}>
+                <Modal title="Shipment Details" open={viewModalOpen} onCancel={() => setViewModalOpen(false)} footer={<Button onClick={() => setViewModalOpen(false)}>Close</Button>} width={560}>
                     {selectedShipment && (
-                        <div className="space-y-6">
-                            <div className="bg-gray-50 p-6 rounded-2xl">
+                        <div className="space-y-4">
+                            <div className="bg-gray-50 p-4 rounded-xl">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <p className="text-xs text-gray-400 uppercase font-bold">Shipment ID</p>
-                                        <p className="font-mono font-bold text-xl text-teal-600">SHI-{String(selectedShipment.id).padStart(3, '0')}</p>
+                                        <p className="text-xs text-gray-500 font-medium">Shipment ID</p>
+                                        <p className="font-mono font-semibold text-lg text-slate-800">SHI-{String(selectedShipment.id).padStart(3, '0')}</p>
                                     </div>
                                     <div className="text-right">
-                                        <Tag color="blue" className="text-lg py-1 px-3 rounded-lg font-bold uppercase">{selectedShipment.deliveryStatus}</Tag>
+                                        <Tag color={deliveryStatusColor(selectedShipment.deliveryStatus)}>{deliveryStatusLabel(selectedShipment.deliveryStatus)}</Tag>
                                     </div>
                                     <div className="col-span-2">
                                         <Divider className="my-2" />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400 uppercase font-bold">Sales Order</p>
-                                        <p className="font-bold text-gray-800">{shortenOrderNumber(selectedShipment.SalesOrder?.orderNumber) || '—'}</p>
+                                        <p className="text-xs text-gray-500 font-medium">Sales Order</p>
+                                        <p className="font-semibold text-slate-800">{shortenOrderNumber(selectedShipment.SalesOrder?.orderNumber) || '—'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400 uppercase font-bold">Customer</p>
-                                        <p className="font-bold text-gray-800">{selectedShipment.SalesOrder?.Customer?.name || '—'}</p>
+                                        <p className="text-xs text-gray-500 font-medium">Customer</p>
+                                        <p className="font-semibold text-slate-800">{selectedShipment.SalesOrder?.Customer?.name || '—'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400 uppercase font-bold">Courier</p>
-                                        <p className="font-medium">{selectedShipment.courierName || '—'}</p>
+                                        <p className="text-xs text-gray-500 font-medium">Courier</p>
+                                        <p>{selectedShipment.courierName || '—'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400 uppercase font-bold">Tracking #</p>
-                                        <p className="font-mono bg-white p-1 rounded border border-gray-200 inline-block">{selectedShipment.trackingNumber || 'PENDING'}</p>
+                                        <p className="text-xs text-gray-500 font-medium">Tracking #</p>
+                                        <p className="font-mono bg-white p-1 rounded border border-gray-200 inline-block text-sm">{selectedShipment.trackingNumber || '—'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400 uppercase font-bold">Dispatch Date</p>
-                                        <p>{formatDate(selectedShipment.dispatchDate)}</p>
+                                        <p className="text-xs text-gray-500 font-medium">Dispatch Date</p>
+                                        <p>{selectedShipment.dispatchDate ? formatDate(selectedShipment.dispatchDate) : '—'}</p>
                                     </div>
+                                    {['SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes((selectedShipment.deliveryStatus || '').toUpperCase()) && (
+                                        <>
+                                            <div className="col-span-2"><Divider className="my-2" /></div>
+                                            <div className="col-span-2">
+                                                <p className="text-xs text-gray-500 font-medium mb-2">Inventory not updated?</p>
+                                                <Button size="small" type="default" onClick={async () => {
+                                                    try {
+                                                        const res = await apiRequest(`/api/shipments/${selectedShipment.id}/deduct-stock`, { method: 'POST' }, token);
+                                                        const msg = res?.message || 'Stock deducted. Refresh Inventory / Products page.';
+                                                        if (res?.deducted > 0) message.success(msg); else message.warning(msg);
+                                                        setViewModalOpen(false);
+                                                        fetchShipments();
+                                                    } catch (e) {
+                                                        message.error(e?.message || 'Deduct failed');
+                                                    }
+                                                }}>Deduct inventory for this shipment</Button>
+                                            </div>
+                                        </>
+                                    )}
+                                    {['READY_TO_SHIP', 'PENDING'].includes((selectedShipment.deliveryStatus || '').toUpperCase()) && (
+                                        <>
+                                            <div className="col-span-2"><Divider className="my-2" /></div>
+                                            <div className="col-span-2">
+                                                <p className="text-xs text-gray-500 font-medium mb-2">Mark order as dispatched</p>
+                                                <Space size="small">
+                                                    <Button type="primary" size="small" className="bg-blue-600" onClick={async () => {
+                                                        try {
+                                                            await apiRequest(`/api/shipments/${selectedShipment.id}`, { method: 'PUT', body: JSON.stringify({ deliveryStatus: 'SHIPPED' }) }, token);
+                                                            message.success('Marked as Shipped');
+                                                            setViewModalOpen(false);
+                                                            fetchShipments();
+                                                        } catch (e) {
+                                                            message.error(e?.message || 'Update failed');
+                                                        }
+                                                    }}>Mark as Shipped</Button>
+                                                    <Button size="small" onClick={async () => {
+                                                        try {
+                                                            await apiRequest(`/api/shipments/${selectedShipment.id}`, { method: 'PUT', body: JSON.stringify({ deliveryStatus: 'DELIVERED' }) }, token);
+                                                            message.success('Marked as Delivered');
+                                                            setViewModalOpen(false);
+                                                            fetchShipments();
+                                                        } catch (e) {
+                                                            message.error(e?.message || 'Update failed');
+                                                        }
+                                                    }}>Mark as Delivered</Button>
+                                                </Space>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>

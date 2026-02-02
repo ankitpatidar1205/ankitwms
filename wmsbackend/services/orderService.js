@@ -14,12 +14,12 @@ async function list(reqUser, query = {}) {
     order: [['createdAt', 'DESC']],
     include: [
       { association: 'Company', attributes: ['id', 'name', 'code'] },
-      { association: 'Customer', attributes: ['id', 'name', 'email'] },
-      { association: 'OrderItems', include: [{ association: 'Product', attributes: ['id', 'name', 'sku'] }] },
+      { association: 'Customer', attributes: ['id', 'name', 'email', 'address', 'city', 'state', 'country', 'postcode'] },
+      { association: 'OrderItems', include: [{ association: 'Product', attributes: ['id', 'name', 'sku', 'weight', 'weightUnit'] }] },
       { association: 'Shipment' },
     ],
   });
-  return orders;
+  return orders.map((o) => o.get({ plain: true }));
 }
 
 async function getById(id, reqUser) {
@@ -143,18 +143,21 @@ async function remove(id, reqUser) {
   const order = await SalesOrder.findByPk(id);
   if (!order) throw new Error('Order not found');
   if (reqUser.role !== 'super_admin' && order.companyId !== reqUser.companyId) throw new Error('Order not found');
-  const allowedStatuses = ['DRAFT', 'CONFIRMED'];
-  if (!allowedStatuses.includes((order.status || '').toUpperCase())) {
-    throw new Error('Only DRAFT or CONFIRMED orders can be deleted');
+  const allowedStatuses = ['DRAFT', 'CONFIRMED', 'PICK_LIST_CREATED'];
+  const status = (order.status || '').toUpperCase();
+  if (!allowedStatuses.includes(status)) {
+    throw new Error(`This sales order cannot be deleted. Current status: ${status || 'Unknown'}. Only Draft, Confirmed or Pick list created orders can be deleted.`);
   }
+  const { PickList, PickListItem, PackingTask, Shipment } = require('../models');
   await OrderItem.destroy({ where: { salesOrderId: order.id } });
-  const { PickList, PickListItem, PackingTask } = require('../models');
   const pickLists = await PickList.findAll({ where: { salesOrderId: order.id } });
   for (const pl of pickLists) {
     await PickListItem.destroy({ where: { pickListId: pl.id } });
     await PackingTask.destroy({ where: { pickListId: pl.id } });
     await pl.destroy();
   }
+  await PackingTask.destroy({ where: { salesOrderId: order.id } });
+  await Shipment.destroy({ where: { salesOrderId: order.id } });
   await order.destroy();
   return { message: 'Order deleted' };
 }

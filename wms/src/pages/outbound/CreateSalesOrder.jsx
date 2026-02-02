@@ -137,68 +137,67 @@ export default function CreateSalesOrder() {
 
     return (
         <MainLayout>
-            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-                <div className="flex items-center gap-4">
-                    <Link to="/sales-orders" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium">
+            <div className="w-full max-w-6xl mx-auto space-y-4 pb-6">
+                <div className="flex items-center gap-3">
+                    <Link to="/sales-orders" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 text-sm font-medium">
                         <ArrowLeftOutlined /> Back
                     </Link>
                 </div>
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Create New Sales Order</h1>
-                    <p className="text-gray-500 mt-1">Add a new customer sales order</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Create New Sales Order</h1>
+                    <p className="text-gray-500 text-sm mt-0.5">Add a new customer sales order</p>
                 </div>
 
                 <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ orderDate: dayjs(), priority: 'MEDIUM', salesChannel: 'DIRECT' }}>
-                    <Card title="Order Information" className="rounded-2xl shadow-sm border-gray-100 mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card title="Order Information" className="rounded-xl border border-gray-100 shadow-sm mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <Form.Item label="Customer" name="customerId" rules={[{ required: true, message: 'Select customer' }]}>
-                                <Select placeholder="Select customer" allowClear className="w-full" size="large">
+                                <Select placeholder="Select customer" allowClear className="w-full">
                                     {customers.map((c) => (
                                         <Option key={c.id} value={c.id}>{c.name} {c.email ? `(${c.email})` : ''}</Option>
                                     ))}
                                 </Select>
                             </Form.Item>
                             <Form.Item label="Order Number">
-                                <Input value="Auto-generated" disabled size="large" className="rounded-lg" />
+                                <Input value="Auto-generated" disabled className="rounded-lg" />
                             </Form.Item>
                             <Form.Item label="Order Date" name="orderDate" rules={[{ required: true, message: 'Required' }]}>
-                                <DatePicker className="w-full" format="YYYY-MM-DD" size="large" />
+                                <DatePicker className="w-full" format="YYYY-MM-DD" />
                             </Form.Item>
                             <Form.Item label="Required Date" name="requiredDate">
-                                <DatePicker className="w-full" format="YYYY-MM-DD" size="large" />
+                                <DatePicker className="w-full" format="YYYY-MM-DD" />
                             </Form.Item>
                             <Form.Item label="Priority" name="priority" rules={[{ required: true }]}>
-                                <Select options={PRIORITY_OPTIONS} className="w-full" size="large" />
+                                <Select options={PRIORITY_OPTIONS} className="w-full" />
                             </Form.Item>
                             <Form.Item label="Sales Channel" name="salesChannel" rules={[{ required: true }]}>
-                                <Select options={CHANNEL_OPTIONS} className="w-full" size="large" />
+                                <Select options={CHANNEL_OPTIONS} className="w-full" />
                             </Form.Item>
                             <Form.Item label="Order Type" name="orderType">
-                                <Select allowClear placeholder="Select" options={ORDER_TYPE_OPTIONS} className="w-full" size="large" />
+                                <Select allowClear placeholder="Select" options={ORDER_TYPE_OPTIONS} className="w-full" />
                             </Form.Item>
                             <Form.Item label="Reference Number" name="referenceNumber">
-                                <Input placeholder="Customer PO or reference" size="large" className="rounded-lg" />
+                                <Input placeholder="Customer PO or reference" className="rounded-lg" />
                             </Form.Item>
                         </div>
                         <Form.Item label="Notes" name="notes">
-                            <TextArea rows={3} placeholder="Add any notes or special instructions..." className="rounded-lg" />
+                            <TextArea rows={2} placeholder="Add any notes or special instructions..." className="rounded-lg" />
                         </Form.Item>
                     </Card>
 
-                    <Card title="Order Items" className="rounded-2xl shadow-sm border-gray-100 mb-6">
-                        <div className="mb-4">
+                    <Card title="Order Items" className="rounded-xl border border-gray-100 shadow-sm mb-4">
+                        <div className="mb-3">
                             <Select
                                 showSearch
                                 placeholder="Search product to add..."
                                 className="w-full max-w-md"
-                                size="large"
                                 onChange={addOrderItem}
                                 value={null}
                                 optionFilterProp="label"
                                 options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
                                 dropdownRender={(menu) => (
                                     <>
-                                        <div className="p-2 border-b border-gray-100 flex items-center gap-2">
+                                        <div className="p-2 border-b border-gray-100 flex items-center gap-2 text-sm">
                                             <PlusOutlined /> Add Item
                                         </div>
                                         {menu}
@@ -207,22 +206,22 @@ export default function CreateSalesOrder() {
                             />
                         </div>
                         {orderItems.length === 0 ? (
-                            <p className="text-gray-500 py-6 text-center">No items added yet. Click &apos;Add Item&apos; above or select a product to begin.</p>
+                            <p className="text-gray-500 py-4 text-center text-sm">No items added yet. Select a product above to begin.</p>
                         ) : (
                             <>
-                                <Table columns={itemColumns} dataSource={orderItems} rowKey="productId" pagination={false} size="small" className="mb-4" />
-                                <div className="text-right text-lg font-bold border-t pt-4">
+                                <Table columns={itemColumns} dataSource={orderItems} rowKey="productId" pagination={false} size="small" className="mb-3" />
+                                <div className="text-right font-semibold border-t pt-3">
                                     Total: {formatCurrency(totalAmount)}
                                 </div>
                             </>
                         )}
                     </Card>
 
-                    <div className="flex gap-4">
-                        <Button type="primary" size="large" htmlType="submit" icon={<SaveOutlined />} loading={saving} className="rounded-xl px-8 h-12 font-bold">
+                    <div className="flex gap-3">
+                        <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} className="rounded-xl px-6">
                             Create Order
                         </Button>
-                        <Button size="large" className="rounded-xl h-12" onClick={() => navigate('/sales-orders')}>
+                        <Button className="rounded-xl" onClick={() => navigate('/sales-orders')}>
                             Cancel
                         </Button>
                     </div>

@@ -117,10 +117,10 @@ export default function Companies() {
     return (
         <MainLayout>
             <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-wrap justify-between items-center gap-4">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Company Management</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Manage companies and multi-tenant setup</p>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Company Management</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">Manage companies and multi-tenant setup</p>
                     </div>
                     {isSuperAdmin && (
                         <Button type="primary" icon={<PlusOutlined />} size="large" onClick={() => { setEditingCompany(null); form.resetFields(); setModalOpen(true); }} className="rounded-xl shadow-md h-12 px-6 bg-blue-600">
@@ -131,7 +131,7 @@ export default function Companies() {
 
                 <Row gutter={[16, 16]}>
                     <Col xs={24} sm={8}>
-                        <Card className="hover:shadow-md transition-all rounded-xl border-gray-100">
+                        <Card className="hover:shadow-md transition-all rounded-xl border border-gray-100 shadow-sm">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 text-xl"><ShopOutlined /></div>
                                 <div>
@@ -142,7 +142,7 @@ export default function Companies() {
                         </Card>
                     </Col>
                     <Col xs={24} sm={8}>
-                        <Card className="hover:shadow-md transition-all rounded-xl border-gray-100">
+                        <Card className="hover:shadow-md transition-all rounded-xl border border-gray-100 shadow-sm">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 text-xl"><TeamOutlined /></div>
                                 <div>
@@ -153,7 +153,7 @@ export default function Companies() {
                         </Card>
                     </Col>
                     <Col xs={24} sm={8}>
-                        <Card className="hover:shadow-md transition-all rounded-xl border-gray-100">
+                        <Card className="hover:shadow-md transition-all rounded-xl border border-gray-100 shadow-sm">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-600 text-xl"><HomeOutlined /></div>
                                 <div>
@@ -165,11 +165,11 @@ export default function Companies() {
                     </Col>
                 </Row>
 
-                <Card className="shadow-sm rounded-xl border-gray-100">
-                    <div className="mb-4 flex justify-between items-center">
+                <Card className="shadow-sm rounded-xl border border-gray-100">
+                    <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
                         <Search placeholder="Search by name or code..." allowClear className="max-w-md rounded-lg" prefix={<SearchOutlined />} onChange={e => setSearchText(e.target.value)} />
                     </div>
-                    <Table columns={columns} dataSource={filtered} rowKey="id" loading={loading} pagination={{ pageSize: 10, className: 'rounded-lg' }} />
+                    <Table columns={columns} dataSource={filtered} rowKey="id" loading={loading} pagination={{ pageSize: 10, showSizeChanger: true, className: 'rounded-lg' }} />
                 </Card>
 
                 {isSuperAdmin && (

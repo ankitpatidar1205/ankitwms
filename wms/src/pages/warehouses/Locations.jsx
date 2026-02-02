@@ -29,7 +29,8 @@ export default function WarehouseLocations() {
         try {
             setLoading(true);
             const data = await apiRequest('/api/locations', { method: 'GET' }, token);
-            setLocations(Array.isArray(data?.data) ? data.data : []);
+            const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            setLocations(list);
         } catch (err) {
             message.error(err.message || 'Failed to load locations');
             setLocations([]);
@@ -177,7 +178,7 @@ export default function WarehouseLocations() {
                         <p className="text-gray-500 text-sm mt-0.5">Manage storage locations across warehouses</p>
                     </div>
                     <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setSelectedLocation(null); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
-                        + Add Location
+                        Add Location
                     </Button>
                 </div>
 

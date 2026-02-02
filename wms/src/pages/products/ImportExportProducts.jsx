@@ -14,14 +14,16 @@ import { MainLayout } from '../../components/layout/MainLayout';
 import { useAuthStore } from '../../store/authStore';
 import { apiRequest } from '../../api/client';
 
-// Saare product fields taaki import ke baad View/Edit me sara data dikhe
+// Saare product fields – zyada fields upload karne ke liye
 const TEMPLATE_HEADERS = [
     'SKU', 'Product Name', 'Barcode', 'Description', 'Type', 'Status', 'Cost Price', 'Selling Price',
     'Category ID', 'Supplier ID', 'Unit of Measure', 'VAT Rate', 'VAT Code', 'Customs Tariff',
     'Heat Sensitive', 'Perishable', 'Require Batch Tracking', 'Shelf Life Days',
     'Reorder Level', 'Reorder Qty', 'Max Stock',
     'Length', 'Width', 'Height', 'Dimension Unit', 'Weight', 'Weight Unit',
+    'Carton Barcode', 'Carton Case Size', 'Carton Description',
     'HD SKU', 'HD Sale SKU', 'Warehouse ID', 'eBay ID', 'Amazon SKU', 'Amazon SKU Split Before', 'Amazon MPN SKU', 'Amazon ID SKU',
+    'Internal Code', 'Notes', 'Sales Channel', 'Tags',
 ];
 
 function parseCSV(text) {
@@ -51,6 +53,10 @@ function rowToProduct(row) {
     const name = get('Product Name') || get('product name') || get('Name');
     const sku = get('SKU') || get('sku');
     if (!name || !sku) return null;
+    const cartonBarcode = get('Carton Barcode') || get('carton barcode');
+    const cartonCaseSize = getNum('Carton Case Size') ?? getNum('carton case size');
+    const cartonDesc = get('Carton Description') || get('carton description');
+    const cartons = (cartonBarcode || cartonCaseSize != null) ? [{ barcode: cartonBarcode || null, caseSize: cartonCaseSize ?? null, description: cartonDesc || null }] : null;
     return {
         sku,
         name,
@@ -79,6 +85,7 @@ function rowToProduct(row) {
         weight: getNum('Weight') ?? getNum('weight'),
         dimensionUnit: get('Dimension Unit') || get('dimension unit') || 'cm',
         weightUnit: get('Weight Unit') || get('weight unit') || 'kg',
+        cartons,
         marketplaceSkus: {
             hdSku: get('HD SKU') || get('hd sku'),
             hdSaleSku: get('HD Sale SKU') || get('hd sale sku'),
@@ -105,9 +112,9 @@ export default function ImportExportProducts() {
         const headerLine = TEMPLATE_HEADERS.join(',');
         // Har column me sample data taaki import ke baad sara data View/Edit me dikhe
         const exampleRows = [
-            ['SKU-001', 'Sample Product 1', '5012345678903', 'Sample description', 'SIMPLE', 'ACTIVE', '10.00', '15.00', '1', '1', 'EACH', '20', 'A_FOOD', '12', 'yes', 'no', 'no', '365', '5', '10', '100', '30', '20', '15', 'cm', '0.5', 'kg', 'HD_SKU_1', 'HD_SALE_1', 'WH_001', 'EBAY_001', 'AMZ_001', 'AMZ_B1', 'AMZ_MPN_1', 'AMZ_ID_1'],
-            ['SKU-002', 'Sample Product 2', '5012345678904', 'Another product', 'SIMPLE', 'ACTIVE', '25.50', '35.00', '2', '2', 'BOX', '20', 'B_STANDARD', '18', 'no', 'yes', 'yes', '180', '10', '20', '200', '40', '25', '20', 'cm', '1.2', 'kg', 'HD_SKU_2', 'HD_SALE_2', 'WH_002', 'EBAY_002', 'AMZ_002', 'AMZ_B2', 'AMZ_MPN_2', 'AMZ_ID_2'],
-            ['SKU-003', 'Third Product', '5012345678905', 'Full data example', 'SIMPLE', 'ACTIVE', '5.00', '12.00', '1', '1', 'KG', '5', 'C_ZERO', '0', 'no', 'no', 'no', '90', '2', '5', '50', '10', '10', '10', 'cm', '0.25', 'kg', '', '', '', '', '', '', '', ''],
+            ['SKU-001', 'Sample Product 1', '5012345678903', 'Sample description', 'SIMPLE', 'ACTIVE', '10.00', '15.00', '1', '1', 'EACH', '20', 'A_FOOD', '12', 'yes', 'no', 'no', '365', '5', '10', '100', '30', '20', '15', 'cm', '0.5', 'kg', 'CARTON-BAR-001', '48', 'Case of 48', 'HD_SKU_1', 'HD_SALE_1', 'WH_001', 'EBAY_001', 'AMZ_001', 'AMZ_B1', 'AMZ_MPN_1', 'AMZ_ID_1', 'INT-001', 'Sample notes', 'DIRECT', 'tag1'],
+            ['SKU-002', 'Sample Product 2', '5012345678904', 'Another product', 'SIMPLE', 'ACTIVE', '25.50', '35.00', '2', '2', 'BOX', '20', 'B_STANDARD', '18', 'no', 'yes', 'yes', '180', '10', '20', '200', '40', '25', '20', 'cm', '1.2', 'kg', 'CARTON-BAR-002', '24', 'Box of 24', 'HD_SKU_2', 'HD_SALE_2', 'WH_002', 'EBAY_002', 'AMZ_002', 'AMZ_B2', 'AMZ_MPN_2', 'AMZ_ID_2', '', '', 'AMAZON', ''],
+            ['SKU-003', 'Third Product', '5012345678905', 'Full data example', 'SIMPLE', 'ACTIVE', '5.00', '12.00', '1', '1', 'KG', '5', 'C_ZERO', '0', 'no', 'no', 'no', '90', '2', '5', '50', '10', '10', '10', 'cm', '0.25', 'kg', '', '', '', '', '', '', '', '', '', '', '', '', ''],
         ];
         const escape = (v) => (v == null || v === '' ? '' : (String(v).includes(',') || String(v).includes('"') ? `"${String(v).replace(/"/g, '""')}"` : v));
         const csv = '\uFEFF' + [headerLine, ...exampleRows.map((row) => row.map(escape).join(','))].join('\n');

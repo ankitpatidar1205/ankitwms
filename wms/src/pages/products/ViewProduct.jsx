@@ -18,6 +18,7 @@ import {
     ClockCircleOutlined,
     BarChartOutlined,
     BarcodeOutlined,
+    MoreOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -161,7 +162,13 @@ export default function ViewProduct() {
 
     if (!product) return null;
 
-    const ms = product.marketplaceSkus && typeof product.marketplaceSkus === 'object' ? product.marketplaceSkus : {};
+    // Safe display: 0 and numbers show, null/undefined show —
+    const showNum = (v) => (v != null && v !== '') ? Number(v) : '—';
+    const showStr = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : '—';
+
+    let ms = product.marketplaceSkus;
+    if (typeof ms === 'string') { try { ms = JSON.parse(ms); } catch { ms = {}; } }
+    ms = (ms && typeof ms === 'object' && !Array.isArray(ms)) ? ms : {};
     const imagesRaw = product.images;
     const imagesList = Array.isArray(imagesRaw)
         ? imagesRaw
@@ -334,13 +341,13 @@ export default function ViewProduct() {
             children: (
                 <Card className="rounded-2xl shadow-sm border-gray-100">
                     <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small" className="rounded-lg overflow-hidden">
-                        <Descriptions.Item label="Reorder Point">{product.reorderLevel ?? '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Reorder Quantity">{product.reorderQty ?? '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Max Stock Level">{product.maxStock ?? '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Heat Sensitive">{product.heatSensitive || '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Perishable">{product.perishable || '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Require Batch Tracking">{product.requireBatchTracking || '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Shelf Life (Days)">{product.shelfLifeDays ?? '—'}</Descriptions.Item>
+                        <Descriptions.Item label="Reorder Point">{showNum(product.reorderLevel)}</Descriptions.Item>
+                        <Descriptions.Item label="Reorder Quantity">{showNum(product.reorderQty)}</Descriptions.Item>
+                        <Descriptions.Item label="Max Stock Level">{showNum(product.maxStock)}</Descriptions.Item>
+                        <Descriptions.Item label="Heat Sensitive">{showStr(product.heatSensitive)}</Descriptions.Item>
+                        <Descriptions.Item label="Perishable">{showStr(product.perishable)}</Descriptions.Item>
+                        <Descriptions.Item label="Require Batch Tracking">{showStr(product.requireBatchTracking)}</Descriptions.Item>
+                        <Descriptions.Item label="Shelf Life (Days)">{showNum(product.shelfLifeDays)}</Descriptions.Item>
                     </Descriptions>
                 </Card>
             ),
@@ -351,12 +358,12 @@ export default function ViewProduct() {
             children: (
                 <Card className="rounded-2xl shadow-sm border-gray-100">
                     <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small" className="rounded-lg overflow-hidden">
-                        <Descriptions.Item label="Length">{product.length != null ? Number(product.length) : '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Width">{product.width != null ? Number(product.width) : '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Height">{product.height != null ? Number(product.height) : '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Dimension Unit">{product.dimensionUnit || '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Weight">{product.weight != null ? Number(product.weight) : '—'}</Descriptions.Item>
-                        <Descriptions.Item label="Weight Unit">{product.weightUnit || '—'}</Descriptions.Item>
+                        <Descriptions.Item label="Length">{showNum(product.length)}</Descriptions.Item>
+                        <Descriptions.Item label="Width">{showNum(product.width)}</Descriptions.Item>
+                        <Descriptions.Item label="Height">{showNum(product.height)}</Descriptions.Item>
+                        <Descriptions.Item label="Dimension Unit">{showStr(product.dimensionUnit)}</Descriptions.Item>
+                        <Descriptions.Item label="Weight">{showNum(product.weight)}</Descriptions.Item>
+                        <Descriptions.Item label="Weight Unit">{showStr(product.weightUnit)}</Descriptions.Item>
                     </Descriptions>
                 </Card>
             ),
@@ -467,7 +474,7 @@ export default function ViewProduct() {
                             <h3 className="font-bold text-slate-800">Supplier Products</h3>
                             <p className="text-gray-500 text-sm">Manage supplier relationships, SKUs, and pricing for this product.</p>
                         </div>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={() => setSupplierModalOpen(true)} className="bg-blue-600 border-blue-600">+ Add Supplier Product</Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => setSupplierModalOpen(true)} className="bg-blue-600 border-blue-600">Add Supplier Product</Button>
                     </div>
                     <Table columns={supplierColumns} dataSource={supplierProducts} rowKey="id" pagination={false} size="small" loading={saving} />
                     <div className="mt-4 p-4 bg-slate-50 rounded-xl text-sm text-gray-600">
@@ -492,7 +499,7 @@ export default function ViewProduct() {
                             <h3 className="font-bold text-slate-800">Marketplace & Channel SKUs</h3>
                             <p className="text-gray-500 text-sm">Manage alternative SKUs for different sales channels (Amazon, Shopify, eBay, etc.)</p>
                         </div>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={() => setAltSkuModalOpen(true)} className="bg-blue-600 border-blue-600">+ Add Alternative SKU</Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => setAltSkuModalOpen(true)} className="bg-blue-600 border-blue-600">Add Alternative SKU</Button>
                     </div>
                     {alternativeSkus.length === 0 ? (
                         <div className="py-12 flex flex-col items-center justify-center text-center">
@@ -500,7 +507,7 @@ export default function ViewProduct() {
                                 <GlobalOutlined className="text-3xl text-slate-400" />
                             </div>
                             <p className="text-gray-500 font-medium mb-2">No alternative SKUs configured</p>
-                            <Button type="primary" icon={<PlusOutlined />} size="large" onClick={() => setAltSkuModalOpen(true)} className="bg-blue-600 border-blue-600">+ Add First Alternative SKU</Button>
+                            <Button type="primary" icon={<PlusOutlined />} size="large" onClick={() => setAltSkuModalOpen(true)} className="bg-blue-600 border-blue-600">Add First Alternative SKU</Button>
                         </div>
                     ) : (
                         <Table columns={altSkuColumns} dataSource={alternativeSkus} rowKey="id" pagination={false} size="small" loading={saving} />
@@ -546,7 +553,18 @@ export default function ViewProduct() {
                     <Card size="small" className="rounded-xl"><div className="text-xs text-gray-500">Selling Price</div><div className="text-lg font-bold">{sellingPrice != null ? formatCurrency(sellingPrice) : '—'}</div></Card>
                 </div>
 
-                <Tabs defaultActiveKey="basic" type="card" className="view-product-tabs" items={tabItems} />
+                <Tabs
+                    defaultActiveKey="basic"
+                    type="card"
+                    className="view-product-tabs"
+                    items={tabItems}
+                    moreIcon={
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm border border-slate-200 shadow-sm">
+                            <MoreOutlined className="text-base" />
+                            More tabs
+                        </span>
+                    }
+                />
 
                 <Modal title="Add Supplier Product" open={supplierModalOpen} onCancel={() => { setSupplierModalOpen(false); supplierForm.resetFields(); }} onOk={() => supplierForm.submit()} okButtonProps={{ loading: saving }} width={520}>
                     <Form form={supplierForm} layout="vertical" onFinish={handleAddSupplierProduct} className="pt-4">

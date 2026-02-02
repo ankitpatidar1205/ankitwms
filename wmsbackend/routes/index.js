@@ -20,9 +20,13 @@ const purchaseOrderRoutes = require('./purchaseOrders');
 const goodsReceivingRoutes = require('./goodsReceiving');
 const replenishmentRoutes = require('./replenishment');
 const returnRoutes = require('./returnRoutes');
+const vatCodeRoutes = require('./vatCodeRoutes');
 const labelsController = require('../controllers/labelsController');
+const searchController = require('../controllers/searchController');
 
 router.use('/auth', authRoutes);
+const searchRoles = ['super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager', 'viewer', 'picker', 'packer'];
+router.get('/api/search', authenticate, requireRole(...searchRoles), searchController.search);
 router.get('/api/labels', authenticate, requireRole('super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager', 'packer', 'viewer'), labelsController.list);
 // Super admin stats & reports (explicit so 404 doesn't happen)
 router.get('/api/superadmin/stats', authenticate, requireSuperAdmin, superadminController.stats);
@@ -44,5 +48,6 @@ router.use('/api/purchase-orders', purchaseOrderRoutes);
 router.use('/api/goods-receiving', goodsReceivingRoutes);
 router.use('/api/replenishment', replenishmentRoutes);
 router.use('/api/returns', returnRoutes);
+router.use('/api/vat-codes', vatCodeRoutes);
 
 module.exports = router;

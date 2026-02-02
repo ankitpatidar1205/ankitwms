@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Dropdown, Badge, Input, Button, Space, theme } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Layout, Menu, Avatar, Dropdown, Badge, Input, Button, Drawer, Space, theme } from 'antd';
 import {
     DashboardOutlined,
     ShopOutlined,
@@ -9,6 +9,7 @@ import {
     UserOutlined,
     BellOutlined,
     SearchOutlined,
+    MenuOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
     LogoutOutlined,
@@ -24,25 +25,39 @@ import {
     ContactsOutlined,
     UsergroupAddOutlined,
     ApiOutlined,
+    DollarOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { APP_NAME } from '../../constants';
 import { hasRoutePermission, isPicker, isPacker, isViewer, isSuperAdmin, isCompanyAdmin, isInventoryManager, isWarehouseManager } from '../../permissions';
+import { apiRequest } from '../../api/client';
 
 const { Header, Sider, Content, Footer } = Layout;
 
 export const MainLayout = ({ children }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { user, logout } = useAuthStore();
+    const { user, logout, token } = useAuthStore();
     const { sidebarCollapsed, toggleSidebar } = useUIStore();
     const [openKeys, setOpenKeys] = useState([]);
+    const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState({ orders: [], products: [], customers: [] });
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchDropdownVisible, setSearchDropdownVisible] = useState(false);
+    const searchContainerRef = useRef(null);
 
     // Current path ka parent submenu open rakho – ek hi submenu open (accordion)
     useEffect(() => {
-        const pathParts = location.pathname.split('/').filter(Boolean);
+        const path = location.pathname;
+        if (path === '/integrations' || path.startsWith('/integrations/')) {
+            setOpenKeys(['nav-integrations']);
+            return;
+        }
+        const pathParts = path.split('/').filter(Boolean);
         if (pathParts.length >= 1) {
             const parentKey = pathParts.length > 1 ? `nav-${pathParts[0]}` : null;
             setOpenKeys(parentKey ? [parentKey] : []);
@@ -52,8 +67,45 @@ export const MainLayout = ({ children }) => {
     const handleMenuClick = ({ key }) => {
         if (key.startsWith('/')) {
             navigate(key);
+            setMobileDrawerOpen(false);
         }
     };
+
+    const runSearch = async () => {
+        const term = searchQuery.trim();
+        if (!term) {
+            setSearchDropdownVisible(false);
+            return;
+        }
+        setSearchLoading(true);
+        setSearchDropdownVisible(true);
+        try {
+            const res = await apiRequest(`/api/search?q=${encodeURIComponent(term)}`, { method: 'GET' }, token);
+            setSearchResults(res.data || { orders: [], products: [], customers: [] });
+        } catch {
+            setSearchResults({ orders: [], products: [], customers: [] });
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+                setSearchDropdownVisible(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 767px)');
+        const handler = () => setIsMobile(mq.matches);
+        mq.addEventListener('change', handler);
+        handler();
+        return () => mq.removeEventListener('change', handler);
+    }, []);
 
     const canAccessMenuItem = (route) => {
         if (!user?.role) return false;
@@ -97,14 +149,7 @@ export const MainLayout = ({ children }) => {
 
     const getSuperAdminMenu = () => [
         { key: '/dashboards/super-admin', icon: <DashboardOutlined />, label: 'Dashboard' },
-        {
-            key: 'nav-companies',
-            icon: <ShopOutlined />,
-            label: 'Company Management',
-            children: [
-                { key: '/companies', label: 'Company List' },
-            ],
-        },
+        { key: '/companies', icon: <ShopOutlined />, label: 'Company Management' },
         { key: '/users', icon: <TeamOutlined />, label: 'User Management' },
         { key: '/reports', icon: <BarChartOutlined />, label: 'Reports' },
         { key: '/settings', icon: <SettingOutlined />, label: 'System Settings' },
@@ -112,15 +157,7 @@ export const MainLayout = ({ children }) => {
 
     const getCompanyAdminMenu = () => [
         { key: '/dashboards/company', icon: <DashboardOutlined />, label: 'Dashboard' },
-        {
-            key: 'nav-companies',
-            icon: <ShopOutlined />,
-            label: 'Company Management',
-            children: [
-                { key: '/companies', label: 'Company List' },
-                { key: '/users', label: 'Company Admin / Users' },
-            ],
-        },
+        { key: '/users', icon: <TeamOutlined />, label: 'User Management' },
         {
             key: 'nav-warehouses',
             icon: <HomeOutlined />,
@@ -180,14 +217,7 @@ export const MainLayout = ({ children }) => {
 
     const allMenuItems = [
         { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
-        {
-            key: 'nav-companies',
-            icon: <ShopOutlined />,
-            label: 'Companies',
-            children: [
-                { key: '/companies', label: 'All Companies' },
-            ],
-        },
+        { key: '/companies', icon: <ShopOutlined />, label: 'Company Management' },
         {
             key: 'nav-warehouses',
             icon: <HomeOutlined />,
@@ -264,14 +294,6 @@ export const MainLayout = ({ children }) => {
             ],
         },
         {
-            key: 'nav-integrations',
-            icon: <ApiOutlined />,
-            label: 'Integrations',
-            children: [
-                { key: '/settings/marketplace-api', label: 'API Connections' },
-            ],
-        },
-        {
             key: 'nav-analytics',
             icon: <BarChartOutlined />,
             label: 'Analytics & Revenue',
@@ -281,17 +303,25 @@ export const MainLayout = ({ children }) => {
             ],
         },
         { key: '/reports', icon: <BarChartOutlined />, label: 'Reports' },
-        { key: '/users', icon: <TeamOutlined />, label: 'Users & Access' },
+        {
+            key: 'nav-integrations',
+            icon: <ApiOutlined />,
+            label: 'Integrations',
+            children: [
+                { key: '/integrations', label: 'API Connections' },
+            ],
+        },
         { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
+        { key: '/users', icon: <TeamOutlined />, label: 'Users & Access' },
     ];
 
     const getMenuItems = () => {
         const userRole = user?.role || '';
         if (isSuperAdmin(userRole)) return getSuperAdminMenu();
-        // Company Admin: full menu but WITHOUT Company Management (company admin doesn't see company menu)
+        // Company Admin: full menu jitna pehle dikh raha tha, sirf Company Management hatao
         if (isCompanyAdmin(userRole)) {
             return allMenuItems
-                .filter(item => item.key !== 'nav-companies')
+                .filter(item => item.key !== '/companies')
                 .map(item => {
                     if (item.children) {
                         const filteredChildren = filterMenuChildren(item.children);
@@ -362,7 +392,7 @@ export const MainLayout = ({ children }) => {
                             <BoxPlotOutlined className="text-lg text-white" />
                         </div>
                         {!sidebarCollapsed && (
-                            <span className="text-white font-bold text-lg tracking-tight truncate">{APP_NAME}</span>
+                            <span className="text-white font-normal text-lg tracking-tight truncate">{APP_NAME}</span>
                         )}
                     </Link>
                 </div>
@@ -383,48 +413,117 @@ export const MainLayout = ({ children }) => {
                     />
                 </div>
             </Sider>
+            <Drawer
+                title={<span className="text-white font-normal text-lg">{APP_NAME}</span>}
+                placement="left"
+                onClose={() => setMobileDrawerOpen(false)}
+                open={mobileDrawerOpen}
+                width={280}
+                className="mobile-sidebar-drawer"
+                styles={{ body: { padding: 0, background: 'linear-gradient(180deg, #0f172a 0%, #0c1222 100%)', height: '100%' }, header: { background: '#0f172a', borderBottom: '1px solid rgba(148, 163, 184, 0.2)' } }}
+                closeIcon={<span className="text-white text-xl leading-none">×</span>}
+            >
+                <Menu
+                    theme="dark"
+                    mode="inline"
+                    selectedKeys={[location.pathname]}
+                    openKeys={openKeys}
+                    onOpenChange={(keys) => setOpenKeys(keys.length ? [keys[keys.length - 1]] : [])}
+                    items={menuItems}
+                    onClick={handleMenuClick}
+                    className="bg-transparent border-none custom-sidebar-menu mt-2"
+                    style={{ background: 'transparent' }}
+                />
+            </Drawer>
 
-            <Layout className="transition-all duration-300" style={{ marginLeft: sidebarCollapsed ? 80 : 260 }}>
-                <Header className="bg-white/90 backdrop-blur-md shadow-sm px-6 flex items-center justify-between h-16 sticky top-0 z-[100] border-b border-gray-100">
-                    <div className="flex items-center gap-6">
-                        <Button
-                            type="text"
-                            icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                            onClick={toggleSidebar}
-                            className="text-lg hover:bg-gray-100 rounded-lg w-10 h-10 flex items-center justify-center translate-x-[-10px]"
-                        />
+            <Layout className="transition-all duration-300" style={{ marginLeft: isMobile ? 0 : (sidebarCollapsed ? 80 : 260) }}>
+                <Header className="bg-white border-b border-gray-200 px-4 sm:px-5 py-2 flex items-center justify-between h-14 sticky top-0 z-[100]">
+                    <Button
+                        type="text"
+                        icon={isMobile ? <MenuOutlined /> : (sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)}
+                        onClick={() => (isMobile ? setMobileDrawerOpen(true) : toggleSidebar())}
+                        className="text-gray-600 hover:bg-gray-100 rounded-lg w-10 h-10 flex items-center justify-center -ml-1 shrink-0 md:w-9 md:h-9"
+                        aria-label={isMobile ? 'Open menu' : (sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar')}
+                    />
 
-                        <div className="hidden lg:flex items-center bg-gray-100 rounded-xl px-3 w-96 border border-transparent focus-within:border-blue-400 focus-within:bg-white transition-all">
-                            <SearchOutlined className="text-gray-400 text-lg" />
+                    <div ref={searchContainerRef} className="hidden md:flex flex-1 max-w-2xl mx-4 relative items-center">
+                        <div className="w-full flex items-stretch rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm h-9">
                             <Input
-                                placeholder="Universal Search (Alt+/)"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onPressEnter={runSearch}
+                                placeholder="Search orders, products, customers..."
                                 variant="borderless"
-                                className="py-2 px-2 text-sm"
+                                className="flex-1 py-2 px-3 text-sm placeholder:text-gray-400 h-full"
+                                prefix={<SearchOutlined className="text-gray-500 text-base mr-1.5" />}
                             />
-                            <div className="bg-white border rounded px-1.5 text-[10px] font-bold text-gray-400">/</div>
+                            <Button type="primary" onClick={runSearch} className="rounded-r-lg h-full min-h-0 px-4 bg-blue-600 hover:bg-blue-700 border-0 flex items-center justify-center shrink-0">
+                                <SearchOutlined className="text-white text-base" />
+                            </Button>
                         </div>
+                        {searchDropdownVisible && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[200] max-h-80 overflow-y-auto">
+                                {searchLoading ? (
+                                    <div className="p-4 text-center text-gray-500 text-sm">Searching...</div>
+                                ) : (
+                                    <>
+                                        {searchResults.orders?.length > 0 && (
+                                            <div className="p-2 border-b border-gray-100">
+                                                <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">Orders</div>
+                                                {searchResults.orders.map((o) => (
+                                                    <div key={o.id} className="px-2 py-2 hover:bg-gray-50 rounded cursor-pointer text-sm" onClick={() => { navigate(`/sales-orders?highlight=${o.id}`); setSearchDropdownVisible(false); }}>
+                                                        <span className="font-medium">{o.orderNumber}</span> {o.referenceNumber && <span className="text-gray-500">· {o.referenceNumber}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {searchResults.products?.length > 0 && (
+                                            <div className="p-2 border-b border-gray-100">
+                                                <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">Products</div>
+                                                {searchResults.products.map((p) => (
+                                                    <div key={p.id} className="px-2 py-2 hover:bg-gray-50 rounded cursor-pointer text-sm" onClick={() => { navigate(`/products?highlight=${p.id}`); setSearchDropdownVisible(false); }}>
+                                                        <span className="font-medium">{p.name}</span> <span className="text-gray-500">{p.sku}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {searchResults.customers?.length > 0 && (
+                                            <div className="p-2">
+                                                <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">Customers</div>
+                                                {searchResults.customers.map((c) => (
+                                                    <div key={c.id} className="px-2 py-2 hover:bg-gray-50 rounded cursor-pointer text-sm" onClick={() => { navigate(`/customers?highlight=${c.id}`); setSearchDropdownVisible(false); }}>
+                                                        <span className="font-medium">{c.name}</span> {c.email && <span className="text-gray-500">· {c.email}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {!searchLoading && searchResults.orders?.length === 0 && searchResults.products?.length === 0 && searchResults.customers?.length === 0 && searchQuery.trim() && (
+                                            <div className="p-4 text-center text-gray-500 text-sm">No results found</div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <Badge count={3} offset={[-2, 6]} size="small" className="cursor-pointer">
-                            <Button type="text" icon={<BellOutlined className="text-xl text-gray-600" />} className="w-10 h-10 rounded-xl hover:bg-gray-100" />
+                    <div className="flex items-center gap-1 sm:gap-3">
+                        <Badge count={5} offset={[-2, 2]} size="small" className="cursor-pointer" style={{ backgroundColor: '#ef4444' }}>
+                            <Button type="text" icon={<BellOutlined className="text-base text-gray-600" />} className="w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-600 min-w-9" />
                         </Badge>
 
                         <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
-                            <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 p-1.5 pr-3 rounded-xl transition-all border border-transparent hover:border-gray-200">
-                                <Avatar size={36} className="bg-blue-600 shadow-sm shadow-blue-100 font-bold uppercase">
-                                    {user?.name?.charAt(0) || 'U'}
-                                </Avatar>
-                                <div className="hidden sm:block leading-tight">
-                                    <div className="text-sm font-semibold text-gray-800">{user?.name || 'Guest User'}</div>
-                                    <div className="text-[11px] font-medium text-blue-600 uppercase tracking-wider">{user?.role?.replace('_', ' ') || 'No Role'}</div>
+                            <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 py-1.5 pl-1 pr-2 rounded-lg border border-transparent hover:border-gray-200 transition-all">
+                                <Avatar size={36} className="bg-gray-200 text-gray-500 border border-gray-200 shrink-0" icon={<UserOutlined />} />
+                                <div className="hidden sm:block leading-tight text-left">
+                                    <div className="text-xs font-semibold text-gray-800">{user?.name || (user?.role === 'super_admin' ? 'Super Administrator' : 'User')}</div>
+                                    <div className="text-[11px] text-gray-500">{user?.role || 'No Role'}</div>
                                 </div>
                             </div>
                         </Dropdown>
                     </div>
                 </Header>
 
-                <Content className="p-8 min-h-[calc(100vh-64px)] overflow-x-hidden relative">
+                <Content className="p-8 min-h-[calc(100vh-56px)] overflow-x-hidden relative">
                     <div className="max-w-[1600px] mx-auto">
                         {children}
                     </div>

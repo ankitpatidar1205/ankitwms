@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Button, Input, Select, Tag, Card, Modal, Form, message, Tabs, Space, Tooltip, Progress } from 'antd';
-import { PlusOutlined, SearchOutlined, EyeOutlined, EditOutlined, DeleteOutlined, InboxOutlined, SyncOutlined, CheckCircleOutlined, RocketOutlined, ReloadOutlined, UserOutlined, ShoppingCartOutlined, EnvironmentOutlined, GiftOutlined } from '@ant-design/icons';
+import { SearchOutlined, EyeOutlined, EditOutlined, DeleteOutlined, RocketOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../../components/layout/MainLayout';
@@ -159,28 +159,34 @@ export default function Packing() {
     };
 
     const columns = [
-        { title: 'Task ID', dataIndex: 'id', key: 'ps', render: (v, r) => <Link to={`/packing/${r.id}`} className="font-bold text-cyan-600 underline">{String(v).slice(0, 8)}...</Link> },
+        { title: 'Task ID', dataIndex: 'id', key: 'ps', render: (v, r) => <Link to={`/packing/${r.id}`} className="font-semibold text-blue-600 hover:underline">{String(v).slice(0, 8)}</Link> },
         { title: 'Sales Order', key: 'order', render: (_, r) => <span className="font-medium text-slate-700">{r.SalesOrder?.orderNumber || '—'}</span> },
         { title: 'Customer', key: 'customer', render: (_, r) => r.SalesOrder?.Customer?.name || '—' },
         {
             title: 'Status', dataIndex: 'status', key: 'status', render: (s) => (
-                <Tag color={(s || '').toUpperCase() === 'PACKED' ? 'green' : (s || '').toUpperCase() === 'PACKING' ? 'blue' : 'orange'} className="uppercase font-black text-[10px]">
+                <Tag color={(s || '').toUpperCase() === 'PACKED' ? 'green' : (s || '').toUpperCase() === 'PACKING' ? 'blue' : 'default'}>
                     {s || 'NOT_STARTED'}
                 </Tag>
             )
         },
         {
-            title: 'Action',
+            title: 'Actions',
             key: 'act',
             render: (_, r) => (
-                <Space>
-                    <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewClick(r)} />
-                    <Button type="text" icon={<EditOutlined className="text-indigo-500" />} onClick={() => handleEditClick(r)} />
-                    <Button type="text" danger icon={<DeleteOutlined />} />
+                <Space size="small">
+                    <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewClick(r)} title="View" />
+                    <Button type="text" icon={<EditOutlined className="text-blue-500" />} onClick={() => handleEditClick(r)} title="Edit" />
+                    <Button type="text" danger icon={<DeleteOutlined />} title="Delete" />
                 </Space>
             )
         }
     ];
+
+    const shortenOrderNumber = (num) => {
+        if (!num) return '—';
+        const parts = String(num).split('-');
+        return parts.length === 3 ? `ORD-${parts[2]}` : num;
+    };
 
     const { user } = useAuthStore.getState();
     const isPacker = user?.role === 'packer';
@@ -188,52 +194,33 @@ export default function Packing() {
     const renderCards = () => {
         if (isPacker) {
             return (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card className="rounded-2xl border-none shadow-sm overflow-hidden group">
-                        <div className="flex flex-col relative z-10">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Dispatched</span>
-                            <span className="text-4xl font-black text-orange-500 group-hover:scale-110 transition-transform">
-                                {packingTasks.filter(t => ['NOT_STARTED', 'PENDING', 'ASSIGNED'].includes((t.status || '').toUpperCase())).length}
-                            </span>
-                        </div>
-                        <div className="absolute top-0 right-0 w-16 h-16 opacity-5 transform rotate-12 text-orange-500 fill-current"><InboxOutlined style={{ fontSize: 64 }} /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-slate-600 text-xs font-medium mb-1">Pending</div>
+                        <div className="text-xl font-bold text-slate-800">{packingTasks.filter(t => ['NOT_STARTED', 'PENDING', 'ASSIGNED'].includes((t.status || '').toUpperCase())).length}</div>
                     </Card>
-                    <Card className="rounded-2xl border-none shadow-sm overflow-hidden group">
-                        <div className="flex flex-col relative z-10">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">In Progress</span>
-                            <span className="text-4xl font-black text-blue-500 group-hover:scale-110 transition-transform">
-                                {packingTasks.filter(t => ['PACKING', 'IN_PROGRESS'].includes((t.status || '').toUpperCase())).length}
-                            </span>
-                        </div>
-                        <div className="absolute top-0 right-0 w-16 h-16 opacity-5 transform rotate-12 text-blue-500 fill-current"><SyncOutlined style={{ fontSize: 64 }} /></div>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-blue-600 text-xs font-medium mb-1">In Progress</div>
+                        <div className="text-xl font-bold text-slate-800">{packingTasks.filter(t => ['PACKING', 'IN_PROGRESS'].includes((t.status || '').toUpperCase())).length}</div>
                     </Card>
-                    <Card className="rounded-2xl border-none shadow-sm overflow-hidden group">
-                        <div className="flex flex-col relative z-10">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Completed</span>
-                            <span className="text-4xl font-black text-cyan-500 group-hover:scale-110 transition-transform">
-                                {packingTasks.filter(t => (t.status || '').toUpperCase() === 'PACKED').length}
-                            </span>
-                        </div>
-                        <div className="absolute top-0 right-0 w-16 h-16 opacity-5 transform rotate-12 text-cyan-500 fill-current"><CheckCircleOutlined style={{ fontSize: 64 }} /></div>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-green-600 text-xs font-medium mb-1">Completed</div>
+                        <div className="text-xl font-bold text-slate-800">{packingTasks.filter(t => (t.status || '').toUpperCase() === 'PACKED').length}</div>
                     </Card>
                 </div>
             );
         }
-
         return (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Pending', count: packingTasks.filter(t => ['NOT_STARTED', 'PENDING'].includes((t.status || '').toUpperCase())).length, color: 'text-orange-500' },
-                    { label: 'Assigned', count: packingTasks.filter(t => (t.status || '').toUpperCase() === 'ASSIGNED').length, color: 'text-purple-500' },
-                    { label: 'In Progress', count: packingTasks.filter(t => (t.status || '').toUpperCase() === 'PACKING').length, color: 'text-blue-500' },
-                    { label: 'Completed', count: packingTasks.filter(t => (t.status || '').toUpperCase() === 'PACKED').length, color: 'text-cyan-500' }
+                    { label: 'Pending', count: packingTasks.filter(t => ['NOT_STARTED', 'PENDING'].includes((t.status || '').toUpperCase())).length },
+                    { label: 'Assigned', count: packingTasks.filter(t => (t.status || '').toUpperCase() === 'ASSIGNED').length },
+                    { label: 'In Progress', count: packingTasks.filter(t => ['PACKING', 'IN_PROGRESS'].includes((t.status || '').toUpperCase())).length },
+                    { label: 'Completed', count: packingTasks.filter(t => (t.status || '').toUpperCase() === 'PACKED').length }
                 ].map((stat, i) => (
-                    <Card key={i} className="rounded-2xl border-none shadow-sm overflow-hidden group">
-                        <div className="flex flex-col relative z-10">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</span>
-                            <span className={`text-4xl font-black ${stat.color} group-hover:scale-110 transition-transform`}>{stat.count}</span>
-                        </div>
-                        <div className={`absolute top-0 right-0 w-16 h-16 opacity-5 transform rotate-12 ${stat.color} fill-current`}><InboxOutlined style={{ fontSize: 64 }} /></div>
+                    <Card key={i} className="rounded-xl border border-gray-100 shadow-sm" bodyStyle={{ padding: '16px' }}>
+                        <div className="text-slate-600 text-xs font-medium mb-1">{stat.label}</div>
+                        <div className="text-xl font-bold text-slate-800">{stat.count}</div>
                     </Card>
                 ))}
             </div>
@@ -242,35 +229,32 @@ export default function Packing() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Packing</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">Final stage verification and containerization</p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1">Dispatched</div><div className="text-3xl font-black text-orange-500">{packingTasks.filter(x => x.status === 'PACKED').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">In Progress</div><div className="text-3xl font-black text-blue-500">{packingTasks.filter(x => x.status === 'PACKING').length}</div></Card>
-                    <Card className="rounded-2xl border-none shadow-sm"><div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Completed</div><div className="text-3xl font-black text-green-500">{packingTasks.filter(x => x.status === 'PACKED').length}</div></Card>
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Packing</h1>
+                    <p className="text-gray-500 text-sm mt-1">Final stage verification and containerization</p>
                 </div>
 
-                <Card className="rounded-3xl shadow-sm border-gray-100 overflow-hidden">
-                    <div className="mb-6 p-2 bg-slate-50 rounded-2xl flex items-center gap-4">
-                        <Search placeholder="Identity Search (Slip, Order, Customer)..." className="max-w-md h-12 shadow-sm rounded-xl" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} />
-                        <div className="flex-1 flex justify-end gap-2">
+                {renderCards()}
+
+                <Card className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="p-4 bg-gray-50/80 border-b border-gray-100 flex flex-wrap items-center gap-3">
+                        <Search placeholder="Search by order or customer..." className="max-w-md" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} allowClear />
+                        <div className="flex-1 flex justify-end gap-2 min-w-0">
                             <Tabs
                                 activeKey={activeTab}
                                 onChange={setActiveTab}
                                 items={[
                                     { key: 'NOT_STARTED', label: 'Pending' },
+                                    ...(isPacker ? [] : [{ key: 'ASSIGNED', label: 'Assigned' }]),
                                     { key: 'PACKING', label: 'In Progress' }
                                 ]}
-                                className="packing-tabs"
+                                className="min-w-0"
                             />
                         </div>
+                        <Button icon={<ReloadOutlined />} onClick={fetchPacking}>Refresh</Button>
                     </div>
-                    <Table columns={columns} dataSource={filteredTasks} rowKey="id" loading={loading} />
+                    <Table columns={columns} dataSource={filteredTasks} rowKey="id" loading={loading} className="px-4" />
                 </Card>
 
                 <Modal title="Accept or Reject Assignment" open={acceptRejectModalOpen} onCancel={() => setAcceptRejectModalOpen(false)} footer={null}>

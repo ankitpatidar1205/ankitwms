@@ -87,10 +87,10 @@
   line-height: 44px !important;
   border-radius: 10px !important;
   margin-bottom: 2px !important;
-  font-weight: 500 !important;
+  font-weight: 400 !important;
   font-size: 0.9375rem !important;
   letter-spacing: 0.01em !important;
-  color: #94a3b8 !important;
+  color: #ffffff !important;
   margin-inline: 10px !important;
   width: calc(100% - 20px) !important;
   transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease !important;
@@ -99,19 +99,19 @@
 .custom-sidebar-menu.ant-menu-dark .ant-menu-item:hover,
 .custom-sidebar-menu.ant-menu-dark .ant-menu-submenu-title:hover {
   background-color: rgba(255, 255, 255, 0.08) !important;
-  color: #e2e8f0 !important;
+  color: #ffffff !important;
 }
 
 .custom-sidebar-menu.ant-menu-dark .ant-menu-item-selected {
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
   color: #ffffff !important;
   box-shadow: 0 4px 14px -2px rgba(37, 99, 235, 0.45) !important;
-  font-weight: 600 !important;
+  font-weight: 400 !important;
 }
 
 .custom-sidebar-menu.ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title {
-  color: #60a5fa !important;
-  font-weight: 600 !important;
+  color: #ffffff !important;
+  font-weight: 400 !important;
 }
 
 .custom-sidebar-menu.ant-menu-dark .ant-menu-inline.ant-menu-sub {
@@ -133,12 +133,18 @@
 
 .custom-sidebar-menu.ant-menu-dark .ant-menu-sub .ant-menu-item-selected {
   background-color: rgba(59, 130, 246, 0.25) !important;
-  color: #93c5fd !important;
+  color: #ffffff !important;
   box-shadow: none !important;
+  font-weight: 400 !important;
+}
+
+.custom-sidebar-menu.ant-menu-dark .ant-menu-sub .ant-menu-item {
+  color: #ffffff !important;
+  font-weight: 400 !important;
 }
 
 .custom-sidebar-menu.ant-menu-dark .ant-menu-submenu-arrow {
-  color: #94a3b8 !important;
+  color: #ffffff !important;
   opacity: 0.9 !important;
 }
 

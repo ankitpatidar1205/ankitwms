@@ -9,6 +9,7 @@ router.get('/products', requireRole('super_admin', 'company_admin', 'inventory_m
 router.get('/products/:id', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.getProduct);
 router.post('/products', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.createProduct);
 router.post('/products/bulk', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.bulkCreateProducts);
+router.post('/products/:id/alternative-skus', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.addAlternativeSku);
 router.put('/products/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.updateProduct);
 router.delete('/products/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.removeProduct);
 

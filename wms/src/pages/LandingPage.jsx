@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Button } from 'antd';
+import { Button, Drawer } from 'antd';
 import {
+    MenuOutlined,
     RocketOutlined,
     SafetyOutlined,
     ThunderboltOutlined,
@@ -30,6 +31,7 @@ import { Link } from 'react-router-dom';
 import CountUp from 'react-countup';
 
 export default function LandingPage() {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const fadeInUp = {
         initial: { opacity: 0, y: 60 },
         animate: { opacity: 1, y: 0 },
@@ -179,8 +181,42 @@ export default function LandingPage() {
                                 </Button>
                             </Link>
                         </div>
+                        <Button
+                            type="text"
+                            icon={<MenuOutlined className="text-xl text-white" />}
+                            onClick={() => setMobileMenuOpen(true)}
+                            className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg hover:bg-slate-700/50"
+                            aria-label="Open menu"
+                        />
                     </div>
                 </motion.nav>
+                <Drawer
+                    title={null}
+                    placement="right"
+                    onClose={() => setMobileMenuOpen(false)}
+                    open={mobileMenuOpen}
+                    width={280}
+                    className="landing-mobile-drawer"
+                    styles={{ body: { padding: 0, background: '#0f172a' }, header: { display: 'none' } }}
+                    closeIcon={<span className="text-white text-lg">×</span>}
+                >
+                    <div className="flex flex-col pt-6">
+                        <a href="#features" className="px-6 py-4 text-gray-300 hover:text-cyan-400 hover:bg-slate-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>Features</a>
+                        <a href="#roles" className="px-6 py-4 text-gray-300 hover:text-cyan-400 hover:bg-slate-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>Roles</a>
+                        <a href="#stats" className="px-6 py-4 text-gray-300 hover:text-cyan-400 hover:bg-slate-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>Stats</a>
+                        <div className="px-6 pt-4 pb-6">
+                            <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                                <Button
+                                    size="large"
+                                    icon={<RocketOutlined />}
+                                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-none text-white shadow-lg h-12"
+                                >
+                                    Get Started
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                </Drawer>
 
                 {/* Hero Section */}
                 <section className="pt-32 pb-20 px-6">

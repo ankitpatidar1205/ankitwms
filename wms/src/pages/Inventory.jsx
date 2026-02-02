@@ -203,11 +203,10 @@ export default function Inventory() {
                         <Button icon={<ReloadOutlined />} onClick={fetchInventory}>Refresh</Button>
                         <Button icon={<ExportOutlined />}>Export</Button>
                         <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setSelectedInventory(null); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
-                            + Add Inventory
+                            Add Inventory
                         </Button>
                     </Space>
                 </div>
-
                 <Tabs
                     activeKey={activeTab}
                     onChange={setActiveTab}

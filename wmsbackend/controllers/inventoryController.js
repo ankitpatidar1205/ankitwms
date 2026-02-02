@@ -50,6 +50,16 @@ async function updateProduct(req, res, next) {
   }
 }
 
+async function addAlternativeSku(req, res, next) {
+  try {
+    const data = await inventoryService.addAlternativeSku(req.params.id, req.body, req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    if (err.message === 'Product not found') return res.status(404).json({ success: false, message: err.message });
+    next(err);
+  }
+}
+
 async function removeProduct(req, res, next) {
   try {
     await inventoryService.removeProduct(req.params.id, req.user);
@@ -299,6 +309,7 @@ module.exports = {
   createProduct,
   bulkCreateProducts,
   updateProduct,
+  addAlternativeSku,
   removeProduct,
   listCategories,
   createCategory,

@@ -1,6 +1,10 @@
 const { Location, Zone, Warehouse } = require('../models');
 const { Op } = require('sequelize');
 
+function normalizeRole(role) {
+  return (role || '').toString().toLowerCase().replace(/-/g, '_').trim();
+}
+
 async function list(reqUser, query = {}) {
   const where = {};
   if (query.zoneId) where.zoneId = query.zoneId;
@@ -8,20 +12,30 @@ async function list(reqUser, query = {}) {
     const zoneIds = await Zone.findAll({ where: { warehouseId: query.warehouseId }, attributes: ['id'] });
     where.zoneId = { [Op.in]: zoneIds.map(z => z.id) };
   }
-  if (reqUser.role === 'company_admin' && reqUser.companyId) {
-    const whIds = await Warehouse.findAll({ where: { companyId: reqUser.companyId }, attributes: ['id'] });
-    const zoneIds = await Zone.findAll({ where: { warehouseId: { [Op.in]: whIds.map(w => w.id) } }, attributes: ['id'] });
-    where.zoneId = { [Op.in]: zoneIds.map(z => z.id) };
-  } else if (reqUser.role !== 'super_admin' && reqUser.warehouseId) {
-    const zoneIds = await Zone.findAll({ where: { warehouseId: reqUser.warehouseId }, attributes: ['id'] });
-    where.zoneId = { [Op.in]: zoneIds.map(z => z.id) };
+  const role = normalizeRole(reqUser.role);
+  // super_admin: no company/warehouse filter -> show all locations
+  if (role !== 'super_admin') {
+    if (role === 'company_admin' && reqUser.companyId) {
+      const whIds = await Warehouse.findAll({ where: { companyId: reqUser.companyId }, attributes: ['id'] });
+      const whIdList = whIds.map(w => w.id);
+      if (whIdList.length > 0) {
+        const zoneRows = await Zone.findAll({ where: { warehouseId: { [Op.in]: whIdList } }, attributes: ['id'] });
+        const zoneIdList = zoneRows.map(z => z.id);
+        where.zoneId = zoneIdList.length > 0 ? { [Op.in]: zoneIdList } : { [Op.in]: [] };
+      } else {
+        where.zoneId = { [Op.in]: [] };
+      }
+    } else if (reqUser.warehouseId) {
+      const zoneIds = await Zone.findAll({ where: { warehouseId: reqUser.warehouseId }, attributes: ['id'] });
+      where.zoneId = { [Op.in]: zoneIds.map(z => z.id) };
+    }
   }
   const locations = await Location.findAll({
     where,
     order: [['createdAt', 'DESC']],
     include: [{ association: 'Zone', include: [{ association: 'Warehouse', attributes: ['id', 'name', 'code'] }] }],
   });
-  return locations;
+  return locations.map(loc => (loc.get ? loc.get({ plain: true }) : loc));
 }
 
 async function getById(id, reqUser) {

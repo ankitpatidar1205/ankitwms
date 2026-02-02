@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { Op } = require('sequelize');
 const { User, Company } = require('../models');
 const { JWT_SECRET } = require('../middlewares/auth');
 
@@ -48,4 +49,27 @@ async function createUser(data) {
   return u;
 }
 
-module.exports = { login, createUser, hashPassword, comparePassword };
+async function updateProfile(userId, data) {
+  const user = await User.findByPk(userId);
+  if (!user) throw new Error('User not found');
+  if (data.name !== undefined) user.name = data.name.trim();
+  if (data.email !== undefined) {
+    const email = data.email.trim().toLowerCase();
+    const existing = await User.findOne({ where: { email, id: { [Op.ne]: userId } } });
+    if (existing) throw new Error('Email already registered');
+    user.email = email;
+  }
+  if (data.newPassword) {
+    if (!data.currentPassword) throw new Error('Current password required to change password');
+    const valid = await comparePassword(data.currentPassword, user.passwordHash);
+    if (!valid) throw new Error('Current password is incorrect');
+    if (data.newPassword.length < 6) throw new Error('New password must be at least 6 characters');
+    user.passwordHash = await hashPassword(data.newPassword);
+  }
+  await user.save();
+  const u = user.toJSON();
+  delete u.passwordHash;
+  return u;
+}
+
+module.exports = { login, createUser, hashPassword, comparePassword, updateProfile };

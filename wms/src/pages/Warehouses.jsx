@@ -117,7 +117,7 @@ export default function Warehouses() {
                         <p className="text-gray-500 text-sm mt-0.5">Manage your warehouse locations and facilities</p>
                     </div>
                     <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setEditMode(false); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
-                        + Add Warehouse
+                        Add Warehouse
                     </Button>
                 </div>
 

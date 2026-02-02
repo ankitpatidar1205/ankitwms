@@ -1,5 +1,6 @@
 /**
- * API base URL - sabhi pages yahi se API call karenge
+ * API base URL - sabhi pages yahi se API call karenge.
+ * .env me VITE_API_URL set karo: localhost ya Railway dono me se koi bhi use kar sakte ho.
  */
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -31,7 +32,9 @@ export async function apiRequest(path, options = {}, token = null) {
     err.data = data;
     throw err;
   }
-  return data;
+  // Backend usually sends { success: true, data: ... }. If response is raw array/object, wrap so res.data works everywhere.
+  if (data != null && typeof data === 'object' && 'data' in data) return data;
+  return { data };
 }
 
 export default { API_BASE_URL, getAuthHeaders, apiRequest };

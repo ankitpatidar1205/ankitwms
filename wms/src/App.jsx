@@ -38,6 +38,7 @@ const Clients = lazy(() => import('./pages/Clients'));
 const AnalyticsPricing = lazy(() => import('./pages/analytics/PricingCalculator'));
 const AnalyticsMargins = lazy(() => import('./pages/analytics/MarginAnalysis'));
 const Reports = lazy(() => import('./pages/Reports'));
+const VatCodes = lazy(() => import('./pages/settings/VatCodes'));
 const MarketplaceApi = lazy(() => import('./pages/integrations/MarketplaceApi'));
 const Roles = lazy(() => import('./pages/Roles'));
 const Products = lazy(() => import('./pages/Products'));
@@ -295,10 +296,12 @@ function App() {
                 <Route path="/inventory/by-best-before-date" element={<ProtectedRoute><InventoryByBestBeforeDate /></ProtectedRoute>} />
                 <Route path="/inventory/by-location" element={<ProtectedRoute><InventoryByLocation /></ProtectedRoute>} />
                 <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+                <Route path="/integrations" element={<ProtectedRoute><MarketplaceApi /></ProtectedRoute>} />
                 <Route path="/settings/marketplace-api" element={<ProtectedRoute><MarketplaceApi /></ProtectedRoute>} />
                 <Route path="/analytics/pricing-calculator" element={<ProtectedRoute><AnalyticsPricing /></ProtectedRoute>} />
                 <Route path="/analytics/margins" element={<ProtectedRoute><AnalyticsMargins /></ProtectedRoute>} />
                 <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                <Route path="/vat-codes" element={<ProtectedRoute><VatCodes /></ProtectedRoute>} />
                 <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
                 <Route
                     path="/profile"

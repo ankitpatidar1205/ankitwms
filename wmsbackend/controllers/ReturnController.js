@@ -2,17 +2,26 @@ const { Return, SalesOrder, Shipment, Customer, Product, ProductStock, sequelize
 
 exports.createRMA = async (req, res) => {
     const { salesOrderId, shipmentId, reason, returnType, notes, items } = req.body;
-    const companyId = req.user.companyId;
+    const isSuperAdmin = (req.user.role || '').toString().toLowerCase().replace(/-/g, '_') === 'super_admin';
+    const userCompanyId = req.user.companyId;
 
     const t = await sequelize.transaction();
     try {
         // 1. Validate Sales Order
-        const order = await SalesOrder.findOne({ where: { id: salesOrderId, companyId } });
+        const orderWhere = { id: salesOrderId };
+        if (!isSuperAdmin) orderWhere.companyId = userCompanyId;
+        const order = await SalesOrder.findOne({ where: orderWhere, include: [{ association: 'Shipment' }] });
         if (!order) throw new Error('Sales Order not found');
-        if (order.status !== 'DELIVERED') throw new Error('RMA can only be created for DELIVERED orders');
+        const companyId = order.companyId;
+        const deliveryStatus = (order.Shipment?.deliveryStatus || '').toUpperCase();
+        const allowedForRMA = ['DELIVERED', 'SHIPPED', 'IN_TRANSIT'].includes(deliveryStatus) || order.status === 'DELIVERED';
+        if (!allowedForRMA) throw new Error('RMA can only be created for shipped/delivered orders');
 
-        // 2. Validate Shipment
-        const shipment = await Shipment.findOne({ where: { id: shipmentId, companyId } });
+        // 2. Resolve Shipment (use provided id or order's shipment)
+        const resolvedShipmentId = shipmentId || order.Shipment?.id;
+        const shipmentWhere = { id: resolvedShipmentId };
+        if (!isSuperAdmin) shipmentWhere.companyId = companyId;
+        const shipment = await Shipment.findOne({ where: shipmentWhere });
         if (!shipment) throw new Error('Shipment record not found');
 
         // 3. Generate RMA Number
@@ -24,7 +33,7 @@ exports.createRMA = async (req, res) => {
             companyId,
             rmaNumber,
             salesOrderId,
-            shipmentId,
+            shipmentId: shipment.id,
             customerId: order.customerId,
             status: 'RMA_CREATED',
             returnType,
@@ -43,11 +52,16 @@ exports.createRMA = async (req, res) => {
 
 exports.getAllReturns = async (req, res) => {
     try {
+        const isSuperAdmin = (req.user.role || '').toString().toLowerCase().replace(/-/g, '_') === 'super_admin';
+        const where = {};
+        if (!isSuperAdmin && req.user.companyId) where.companyId = req.user.companyId;
+        if (isSuperAdmin && req.query.companyId) where.companyId = req.query.companyId;
+
         const returns = await Return.findAll({
-            where: { companyId: req.user.companyId },
+            where,
             include: [
-                { model: SalesOrder, attributes: ['orderNumber'] },
-                { model: Customer, attributes: ['name'] }
+                { model: SalesOrder, attributes: ['id', 'orderNumber'] },
+                { model: Customer, attributes: ['id', 'name', 'email'] }
             ],
             order: [['createdAt', 'DESC']]
         });
@@ -59,8 +73,11 @@ exports.getAllReturns = async (req, res) => {
 
 exports.getReturnById = async (req, res) => {
     try {
+        const isSuperAdmin = (req.user.role || '').toString().toLowerCase().replace(/-/g, '_') === 'super_admin';
+        const where = { id: req.params.id };
+        if (!isSuperAdmin && req.user.companyId) where.companyId = req.user.companyId;
         const rma = await Return.findOne({
-            where: { id: req.params.id, companyId: req.user.companyId },
+            where,
             include: [SalesOrder, Shipment, Customer]
         });
         if (!rma) return res.status(404).json({ success: false, message: 'RMA not found' });
@@ -72,7 +89,10 @@ exports.getReturnById = async (req, res) => {
 
 exports.receiveItem = async (req, res) => {
     try {
-        const rma = await Return.findOne({ where: { id: req.params.id, companyId: req.user.companyId } });
+        const isSuperAdmin = (req.user.role || '').toString().toLowerCase().replace(/-/g, '_') === 'super_admin';
+        const where = { id: req.params.id };
+        if (!isSuperAdmin && req.user.companyId) where.companyId = req.user.companyId;
+        const rma = await Return.findOne({ where });
         if (!rma) throw new Error('RMA not found');
 
         // Strict Flow: RMA_CREATED or AWAITING_RETURN -> RECEIVED
@@ -92,11 +112,13 @@ exports.receiveItem = async (req, res) => {
 };
 
 exports.inspectRMA = async (req, res) => {
-    // Outcome: APPROVED or REJECTED
-    const { outcome, recoveryValue, notes } = req.body; // outcome = 'APPROVED' | 'REJECTED'
+    const { outcome, recoveryValue, notes } = req.body;
 
     try {
-        const rma = await Return.findOne({ where: { id: req.params.id, companyId: req.user.companyId } });
+        const isSuperAdmin = (req.user.role || '').toString().toLowerCase().replace(/-/g, '_') === 'super_admin';
+        const where = { id: req.params.id };
+        if (!isSuperAdmin && req.user.companyId) where.companyId = req.user.companyId;
+        const rma = await Return.findOne({ where });
         if (!rma) throw new Error('RMA not found');
 
         if (rma.status !== 'RECEIVED' && rma.status !== 'IN_INSPECTION') {
@@ -125,7 +147,10 @@ exports.processRefund = async (req, res) => {
     const { amount } = req.body;
 
     try {
-        const rma = await Return.findOne({ where: { id: req.params.id, companyId: req.user.companyId } });
+        const isSuperAdmin = (req.user.role || '').toString().toLowerCase().replace(/-/g, '_') === 'super_admin';
+        const where = { id: req.params.id };
+        if (!isSuperAdmin && req.user.companyId) where.companyId = req.user.companyId;
+        const rma = await Return.findOne({ where });
         if (!rma) throw new Error('RMA not found');
 
         if (rma.status !== 'APPROVED') throw new Error('RMA must be APPROVED before refund');
@@ -144,7 +169,10 @@ exports.processRefund = async (req, res) => {
 
 exports.closeRMA = async (req, res) => {
     try {
-        const rma = await Return.findOne({ where: { id: req.params.id, companyId: req.user.companyId } });
+        const isSuperAdmin = (req.user.role || '').toString().toLowerCase().replace(/-/g, '_') === 'super_admin';
+        const where = { id: req.params.id };
+        if (!isSuperAdmin && req.user.companyId) where.companyId = req.user.companyId;
+        const rma = await Return.findOne({ where });
         if (!rma) throw new Error('RMA not found');
 
         if (!['REFUNDED', 'REJECTED'].includes(rma.status)) {

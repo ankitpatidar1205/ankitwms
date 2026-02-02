@@ -56,7 +56,7 @@ export default function ViewSalesOrder() {
 
     return (
         <MainLayout>
-            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+            <div className="w-full max-w-6xl mx-auto space-y-6 pb-8">
                 <div className="flex items-center justify-between">
                     <Link to="/sales-orders" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium">
                         <ArrowLeftOutlined /> Back

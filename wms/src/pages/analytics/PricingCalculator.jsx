@@ -8,14 +8,13 @@ import { MainLayout } from '../../components/layout/MainLayout';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+// OnBuy, TEMU, TikTok removed per client – Alternative SKUs / channels list
 const CHANNELS = [
     { value: 'Amazon_FBA', label: 'Amazon FBA', feePercent: 15, fulfillment: 3.50 },
     { value: 'Amazon_UK_FBA', label: 'Amazon UK FBA', feePercent: 15.3, fulfillment: 3.25 },
     { value: 'Amazon_UK_MFN', label: 'Amazon UK MFN', feePercent: 13.5, fulfillment: 0 },
     { value: 'Shopify', label: 'Shopify', feePercent: 2.9, fulfillment: 0 },
     { value: 'eBay', label: 'eBay', feePercent: 12.8, fulfillment: 0 },
-    { value: 'TikTok', label: 'TikTok Shop', feePercent: 5.0, fulfillment: 0 },
-    { value: 'Temu', label: 'Temu', feePercent: 8.0, fulfillment: 0 },
     { value: 'Direct', label: 'Direct / Website', feePercent: 0, fulfillment: 0 },
 ];
 

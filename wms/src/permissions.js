@@ -77,6 +77,7 @@ export const ROUTE_PERMISSIONS = {
     '/integrations': MANAGEMENT_ROLES,
     '/analytics': VIEWER_ROUTES,
     '/reports': VIEWER_ROUTES,
+    '/vat-codes': ['super_admin', 'company_admin', 'inventory_manager', 'viewer'],
     '/scanner': ALL_ROLES,
     '/auth/login': ALL_ROLES,
     '/auth/register': ALL_ROLES,

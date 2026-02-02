@@ -75,6 +75,9 @@ app.delete('/api/goods-receiving/:id', authenticate, requireRole(...grWriteRoles
 const invProductRoles = ['super_admin', 'company_admin', 'inventory_manager'];
 app.delete('/api/inventory/products/:id', authenticate, requireRole(...invProductRoles), inventoryController.removeProduct);
 
+// POST /api/products/:id/alternative-skus (same handler as inventory, so client can call either path)
+app.post('/api/products/:id/alternative-skus', authenticate, requireRole(...invProductRoles), inventoryController.addAlternativeSku);
+
 const returnRoutes = require('./routes/returnRoutes');
 app.use('/api/returns', returnRoutes);
 
@@ -120,7 +123,8 @@ async function start() {
         }
       }
     }
-    await sequelize.sync({ alter: true });
+    // MySQL: skip alter to avoid "Too many keys" on tables that already have many indexes (e.g. users)
+    await sequelize.sync({ alter: dialect === 'sqlite' });
     if (dialect === 'sqlite') {
       await sequelize.query('PRAGMA foreign_keys = ON');
     }
@@ -143,6 +147,12 @@ async function start() {
     });
   } catch (err) {
     console.error('Unable to start server:', err);
+    const isConnectionRefused = err?.code === 'ECONNREFUSED' || err?.parent?.code === 'ECONNREFUSED' || err?.name === 'SequelizeConnectionRefusedError';
+    if (isConnectionRefused && (process.env.DB_DIALECT || 'sqlite') === 'mysql') {
+      console.error('\n--- MySQL connection refused ---');
+      console.error('Either: 1) Start MySQL (XAMPP/WAMP/MySQL service), or');
+      console.error('        2) Use SQLite: in .env set DB_DIALECT=sqlite (or remove DB_DIALECT) and restart.\n');
+    }
     process.exit(1);
   }
 }

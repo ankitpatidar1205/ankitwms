@@ -41,4 +41,15 @@ async function update(req, res, next) {
   }
 }
 
-module.exports = { list, getById, create, update };
+async function deductStock(req, res, next) {
+  try {
+    const data = await shipmentService.deductStockForShipment(req.params.id, req.user);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    if (err.message === 'Shipment not found') return res.status(404).json({ success: false, message: err.message });
+    if (err.message === 'Only shipped/delivered shipments can deduct stock') return res.status(400).json({ success: false, message: err.message });
+    next(err);
+  }
+}
+
+module.exports = { list, getById, create, update, deductStock };

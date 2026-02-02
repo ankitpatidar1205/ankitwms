@@ -7,7 +7,6 @@ import {
     WarningOutlined,
     ReloadOutlined,
     BarChartOutlined,
-    ArrowUpOutlined
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -107,27 +106,28 @@ export default function ManagerDashboard() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="space-y-8 animate-in fade-in duration-300">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Operations Command</h1>
-                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose">High-level strategic overview of warehouse health, node efficiency, and team choreography</p>
+                        <h1 className="text-2xl font-bold text-slate-900">Warehouse Manager Dashboard</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">Overview of warehouse operations, team performance, and alerts</p>
                     </div>
-                    <Space>
-                        <Button icon={<BarChartOutlined />} className="rounded-lg">Analytics Reports</Button>
+                    <Space wrap>
+                        <Link to="/reports">
+                            <Button icon={<BarChartOutlined />} className="rounded-lg border-gray-200">Analytics Reports</Button>
+                        </Link>
                         <Button
                             type="primary"
                             icon={<ReloadOutlined />}
                             loading={loading}
                             onClick={() => fetchData()}
-                            className="rounded-lg shadow-md"
+                            className="rounded-lg bg-blue-600"
                         >
                             Refresh Data
                         </Button>
                     </Space>
                 </div>
 
-                {/* KPI Cards */}
                 <Row gutter={[16, 16]}>
                     <Col xs={24} sm={12} lg={6}>
                         <KPICard
@@ -169,11 +169,10 @@ export default function ManagerDashboard() {
                     </Col>
                 </Row>
 
-                {/* Staff Performance */}
                 <Card
-                    title={<span className="font-bold text-gray-700">Team Performance Monitor</span>}
-                    className="shadow-sm rounded-xl border-gray-100"
-                    extra={<Button type="link" className="text-blue-600">Manage Teams</Button>}
+                    title={<span className="font-semibold text-gray-800">Team Performance Monitor</span>}
+                    className="rounded-xl border border-gray-100 shadow-sm"
+                    extra={<Link to="/users"><Button type="link" className="text-blue-600 px-0">Manage Teams</Button></Link>}
                 >
                     <Table
                         dataSource={data.staffPerformance}
@@ -184,30 +183,33 @@ export default function ManagerDashboard() {
                     />
                 </Card>
 
-                {/* Manager Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <Link to="/users">
-                        <Card hoverable className="text-center rounded-xl p-2 border-blue-50">
+                        <Card hoverable className="text-center rounded-xl border border-gray-100 shadow-sm p-4 transition-all hover:border-blue-200 hover:shadow-md">
                             <TeamOutlined className="text-2xl text-blue-500 mb-2" />
-                            <h4 className="font-bold">Staff Directory</h4>
+                            <h4 className="font-semibold text-gray-800">Staff Directory</h4>
+                            <p className="text-xs text-gray-500 mt-0.5">View & manage team</p>
                         </Card>
                     </Link>
                     <Link to="/reports">
-                        <Card hoverable className="text-center rounded-xl p-2 border-green-50">
+                        <Card hoverable className="text-center rounded-xl border border-gray-100 shadow-sm p-4 transition-all hover:border-green-200 hover:shadow-md">
                             <BarChartOutlined className="text-2xl text-green-500 mb-2" />
-                            <h4 className="font-bold">Operations Report</h4>
+                            <h4 className="font-semibold text-gray-800">Operations Report</h4>
+                            <p className="text-xs text-gray-500 mt-0.5">Analytics & reports</p>
                         </Card>
                     </Link>
                     <Link to="/warehouses">
-                        <Card hoverable className="text-center rounded-xl p-2 border-purple-50">
+                        <Card hoverable className="text-center rounded-xl border border-gray-100 shadow-sm p-4 transition-all hover:border-purple-200 hover:shadow-md">
                             <DatabaseOutlined className="text-2xl text-purple-500 mb-2" />
-                            <h4 className="font-bold">Network Config</h4>
+                            <h4 className="font-semibold text-gray-800">Warehouses</h4>
+                            <p className="text-xs text-gray-500 mt-0.5">Zones & locations</p>
                         </Card>
                     </Link>
                     <Link to="/inventory">
-                        <Card hoverable className="text-center rounded-xl p-2 border-orange-50">
+                        <Card hoverable className="text-center rounded-xl border border-gray-100 shadow-sm p-4 transition-all hover:border-orange-200 hover:shadow-md">
                             <WarningOutlined className="text-2xl text-orange-500 mb-2" />
-                            <h4 className="font-bold">Inventory Audit</h4>
+                            <h4 className="font-semibold text-gray-800">Inventory Audit</h4>
+                            <p className="text-xs text-gray-500 mt-0.5">Stock overview</p>
                         </Card>
                     </Link>
                 </div>

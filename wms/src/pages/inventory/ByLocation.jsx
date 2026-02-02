@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Button, Card, Form, Select, Empty, Tag, message } from 'antd';
-import { EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined } from '@ant-design/icons';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { useAuthStore } from '../../store/authStore';
 import { apiRequest } from '../../api/client';
@@ -49,18 +49,27 @@ export default function InventoryByLocation() {
         if (token) fetchData();
     }, [token]);
 
+    const totalLocations = data.length;
+    const totalItemsSum = data.reduce((s, r) => s + (Number(r.totalItems) || 0), 0);
+    const totalProductCount = data.reduce((s, r) => s + (Number(r.productCount) || 0), 0);
+    const withWarnings = data.filter((r) => r.warnings && r.warnings !== '—').length;
+
     const columns = [
         {
             title: 'Location',
             key: 'location',
             width: 260,
-            render: (_, r) => (
-                <div>
-                    <div className="font-medium text-blue-600">{r.locationCode || r.locationName || '—'}</div>
-                    {r.pickSequence != null && <Tag color="purple" className="mt-1">Seq: {r.pickSequence}</Tag>}
-                    {r.locationName && r.locationCode !== r.locationName && <div className="text-gray-500 text-sm mt-0.5">{r.locationName}</div>}
-                </div>
-            ),
+            render: (_, r) => {
+                const primary = (r.locationCode && r.locationCode !== '—' ? r.locationCode : r.locationName) || '—';
+                const showSubName = r.locationName && r.locationCode !== r.locationName && primary !== r.locationName;
+                return (
+                    <div>
+                        <div className="font-medium text-blue-600">{primary}</div>
+                        {r.pickSequence != null && <Tag color="purple" className="mt-1">Seq: {r.pickSequence}</Tag>}
+                        {showSubName && <div className="text-gray-500 text-sm mt-0.5">{r.locationName}</div>}
+                    </div>
+                );
+            },
         },
         {
             title: 'Type',
@@ -92,36 +101,57 @@ export default function InventoryByLocation() {
     return (
         <MainLayout>
             <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <EnvironmentOutlined className="text-2xl text-blue-600" />
-                        <div>
-                            <h1 className="text-2xl font-medium text-blue-600">Inventory by Location</h1>
-                            <p className="text-gray-500 text-sm mt-0.5">View stock grouped by location name</p>
-                        </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Inventory by Location</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">View stock grouped by location</p>
                     </div>
                     <Button icon={<ReloadOutlined />} className="rounded-lg" onClick={fetchData} loading={loading}>
                         Refresh
                     </Button>
                 </div>
 
-                <Card className="rounded-xl shadow-sm border-gray-100">
-                    <Form form={form} layout="inline" className="flex flex-wrap gap-4 mb-4">
-                        <Form.Item name="warehouseId" label="Select Warehouse" className="mb-0">
-                            <Select placeholder="Select Warehouse" allowClear className="w-48 rounded-lg" options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
-                        </Form.Item>
-                        <Form.Item name="locationType" label="Location Type" className="mb-0">
-                            <Select placeholder="Location Type" allowClear className="w-40 rounded-lg" options={[{ value: 'PICK', label: 'Pick' }, { value: 'BULK', label: 'Bulk' }, { value: 'QUARANTINE', label: 'Quarantine' }, { value: 'STAGING', label: 'Staging' }]} />
-                        </Form.Item>
-                    </Form>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">Total Locations</div>
+                        <div className="text-xl font-medium text-blue-600">{formatNumber(totalLocations)}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">Total Items</div>
+                        <div className="text-xl font-medium text-green-600">{formatNumber(totalItemsSum)}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">Product Count</div>
+                        <div className="text-xl font-medium text-purple-600">{formatNumber(totalProductCount)}</div>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm border-gray-100">
+                        <div className="text-gray-500 text-sm">With Warnings</div>
+                        <div className="text-xl font-medium text-orange-600">{formatNumber(withWarnings)}</div>
+                    </Card>
+                </div>
 
+                <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
+                    <div className="flex flex-wrap items-center gap-3 px-4 py-4 border-b border-gray-100">
+                        <Form form={form} layout="inline" className="flex flex-wrap gap-3">
+                            <Form.Item name="warehouseId" label="Warehouse" className="mb-0">
+                                <Select placeholder="Select warehouse" allowClear className="w-48 rounded-lg" options={warehouses.map(w => ({ value: w.id, label: w.name }))} onChange={() => fetchData()} />
+                            </Form.Item>
+                            <Form.Item name="locationType" label="Type" className="mb-0">
+                                <Select placeholder="Location type" allowClear className="w-40 rounded-lg" options={[{ value: 'PICK', label: 'Pick' }, { value: 'BULK', label: 'Bulk' }, { value: 'QUARANTINE', label: 'Quarantine' }, { value: 'STAGING', label: 'Staging' }]} onChange={() => fetchData()} />
+                            </Form.Item>
+                            <Form.Item className="mb-0">
+                                <Button type="primary" htmlType="button" icon={<ReloadOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={fetchData} loading={loading}>Apply</Button>
+                            </Form.Item>
+                        </Form>
+                    </div>
                     <Table
                         columns={columns}
                         dataSource={data}
                         rowKey={(r) => r.locationId ?? `loc-${r.locationCode}-${r.locationName}`}
                         loading={loading}
                         pagination={{ showSizeChanger: true, showTotal: (t) => `Total ${t} locations`, pageSize: 20 }}
-                        className="[&_.ant-table-thead_th]:font-normal"
+                        className="[&_.ant-table-thead_th]:font-normal [&_.ant-table]:px-4"
+                        scroll={{ x: 900 }}
                         locale={{
                             emptyText: (
                                 <Empty

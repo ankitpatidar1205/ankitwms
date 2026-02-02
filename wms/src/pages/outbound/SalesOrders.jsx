@@ -16,6 +16,7 @@ export default function SalesOrders() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('all');
     const [channelFilter, setChannelFilter] = useState('all');
+    const [channelMulti, setChannelMulti] = useState([]);
     const [searchText, setSearchText] = useState('');
 
     const fetchOrders = useCallback(async () => {
@@ -53,8 +54,10 @@ export default function SalesOrders() {
             order.orderNumber?.toLowerCase().includes(searchText.toLowerCase()) ||
             customerName.toLowerCase().includes(searchText.toLowerCase());
 
-        const matchesChannel = channelFilter === 'all' ||
-            (order.salesChannel?.toUpperCase() || 'DIRECT') === channelFilter.toUpperCase();
+        const orderChannel = (order.salesChannel || 'DIRECT').toUpperCase();
+        const matchesChannel = channelFilter === 'all'
+            ? (channelMulti.length === 0 || channelMulti.includes(orderChannel))
+            : orderChannel === channelFilter.toUpperCase();
 
         let matchesStatus = true;
         if (activeTab !== 'all') {
@@ -78,29 +81,35 @@ export default function SalesOrders() {
         return parts.length === 3 ? `ORD-${parts[2]}` : num;
     };
 
+    const CHANNEL_OPTIONS = [
+        { value: 'AMAZON', label: 'Amazon' },
+        { value: 'EBAY', label: 'eBay' },
+        { value: 'SHOPIFY', label: 'Shopify' },
+        { value: 'DIRECT', label: 'Direct' },
+    ];
+
     const columns = [
-        { title: 'Order #', dataIndex: 'orderNumber', key: 'orderNumber', render: (v, r) => <Link to={`/sales-orders/${r.id}`} className="font-bold text-blue-600 hover:underline">{shortenOrderNumber(v)}</Link> },
-        { title: 'Customer', key: 'customer', render: (_, r) => (r.Customer?.name || r.customer?.name) || '-' },
-        { title: 'Channel', dataIndex: 'salesChannel', key: 'channel', render: (c) => <Tag color="blue" className="uppercase">{c || 'Direct'}</Tag> },
-        { title: 'Date', dataIndex: 'orderDate', key: 'orderDate', render: (v, r) => formatDate(v || r.createdAt) },
-        { title: 'Total', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => <span className="font-medium text-slate-800">{formatCurrency(v)}</span> },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={getStatusColor(s)} className="uppercase font-bold">{s === 'PICK_LIST_CREATED' ? 'CONFIRMED' : s}</Tag> },
+        { title: 'Order #', dataIndex: 'orderNumber', key: 'orderNumber', width: 120, render: (v, r) => <Link to={`/sales-orders/${r.id}`} className="font-bold text-blue-600 hover:underline">{shortenOrderNumber(v)}</Link> },
+        { title: 'Customer', key: 'customer', width: 160, render: (_, r) => (r.Customer?.name || r.customer?.name) || '-' },
+        { title: 'Channel', dataIndex: 'salesChannel', key: 'channel', width: 110, render: (c) => <Tag color="blue" className="uppercase">{c || 'Direct'}</Tag> },
+        { title: 'SKU(s)', key: 'skus', width: 180, ellipsis: true, render: (_, r) => (r.OrderItems || r.orderItems || []).map((i) => i.Product?.sku || i.product?.sku).filter(Boolean).join(', ') || '—' },
+        { title: 'Date', dataIndex: 'orderDate', key: 'orderDate', width: 110, render: (v, r) => formatDate(v || r.createdAt) },
+        { title: 'Total', dataIndex: 'totalAmount', key: 'totalAmount', width: 100, render: (v) => <span className="font-medium text-slate-800">{formatCurrency(v)}</span> },
+        { title: 'Status', dataIndex: 'status', key: 'status', width: 120, render: (s) => <Tag color={getStatusColor(s)} className="uppercase font-bold">{s === 'PICK_LIST_CREATED' ? 'CONFIRMED' : s}</Tag> },
         {
             title: 'Actions',
             key: 'actions',
             render: (_, record) => {
-                const canEditDelete = ['DRAFT', 'CONFIRMED'].includes((record.status || '').toUpperCase());
+                const canEdit = ['DRAFT', 'CONFIRMED'].includes((record.status || '').toUpperCase());
                 return (
-                    <Space onClick={(e) => e.stopPropagation()} role="group">
+                    <Space onClick={(e) => e.stopPropagation()} role="group" size="small">
                         <Button type="text" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); navigate(`/sales-orders/${record.id}`); }} title="View" />
-                        {canEditDelete && (
+                        {canEdit && (
                             <Button type="text" icon={<EditOutlined className="text-blue-500" />} onClick={(e) => { e.stopPropagation(); navigate(`/sales-orders/${record.id}/edit`); }} title="Edit" />
                         )}
-                        {canEditDelete && (
-                            <Popconfirm title="Delete this order?" onConfirm={() => handleDeleteOrder(record.id)} okText="Yes" cancelText="No">
-                                <Button type="text" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} title="Delete" />
-                            </Popconfirm>
-                        )}
+                        <Popconfirm title="Delete this order?" onConfirm={() => handleDeleteOrder(record.id)} okText="Yes" cancelText="No">
+                            <Button type="text" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} title="Delete" />
+                        </Popconfirm>
                     </Space>
                 );
             }
@@ -157,18 +166,19 @@ export default function SalesOrders() {
                 <Card className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                     <div className="p-4 bg-gray-50/80 rounded-t-xl border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
                         <div className="flex items-center gap-3 flex-1 flex-wrap">
-                            <Search placeholder="Order# / Customer..." className="max-w-xs" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} allowClear />
+                            <Search placeholder="Order# / Customer..." className="max-w-xs" value={searchText} onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} allowClear />
                             <Select value={channelFilter} onChange={setChannelFilter} className="w-40" options={[
                                 { value: 'all', label: 'All Channels' },
-                                { value: 'AMAZON_FBA', label: 'Amazon FBA' },
-                                { value: 'SHOPIFY', label: 'Shopify Store' },
-                                { value: 'EBAY', label: 'eBay Global' },
-                                { value: 'DIRECT', label: 'Direct Sales' },
+                                { value: 'AMAZON', label: 'Amazon' },
+                                { value: 'SHOPIFY', label: 'Shopify' },
+                                { value: 'EBAY', label: 'eBay' },
+                                { value: 'DIRECT', label: 'Direct' },
                             ]} />
+                            <Select mode="multiple" placeholder="Filter by channel (multi)" value={channelMulti} onChange={setChannelMulti} className="w-56" options={CHANNEL_OPTIONS} allowClear />
                         </div>
                         <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} className="min-w-0" />
                     </div>
-                    <Table columns={columns} dataSource={filteredOrders} rowKey="id" loading={loading} pagination={{ pageSize: 20 }} className="px-4" />
+                    <Table columns={columns} dataSource={filteredOrders} rowKey="id" loading={loading} pagination={{ pageSize: 20 }} scroll={{ x: 1000 }} className="px-4" />
                 </Card>
             </div>
         </MainLayout>

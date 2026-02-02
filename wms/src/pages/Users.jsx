@@ -232,7 +232,7 @@ export default function Users() {
                         <h1 className="text-2xl font-semibold text-blue-600">User Management</h1>
                         <p className="text-gray-500 text-sm mt-0.5">Manage user accounts, roles, and permissions</p>
                     </div>
-                    <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={openAdd}>+ Add User</Button>
+                    <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={openAdd}>Add User</Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

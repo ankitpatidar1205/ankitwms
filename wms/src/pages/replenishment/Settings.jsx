@@ -164,6 +164,25 @@ export default function ReplenishmentSettings() {
         }
     };
 
+    const runAutoCheckAndCreateTasks = async () => {
+        if (!token) return;
+        setLoading(true);
+        try {
+            const res = await apiRequest('/api/replenishment/configs/auto-check', { method: 'POST' }, token);
+            const list = Array.isArray(res?.data) ? res.data : [];
+            const created = res?.tasksCreated ?? 0;
+            setSuggestions(list);
+            setSuggestionsModalOpen(true);
+            if (created > 0) message.success(res?.message || `Created ${created} replenishment task(s). Go to Replenishment → Tasks.`);
+            else if (list.length === 0) message.info('No products below reorder point. All good!');
+            else message.info(res?.message || 'No tasks created (need BULK and PICK locations).');
+        } catch (err) {
+            message.error(err?.message || err?.data?.message || 'Auto-check & create tasks failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const openCreateTaskFromSuggestion = (suggestion) => {
         setSelectedSuggestion(suggestion);
         createTaskForm.setFieldsValue({
@@ -263,8 +282,9 @@ export default function ReplenishmentSettings() {
                         <h1 className="text-2xl font-semibold text-blue-600">Replenishment Settings</h1>
                         <p className="text-gray-500 text-sm mt-0.5">Configure proactive replenishment limits and reorder points</p>
                     </div>
-                    <Space>
+                    <Space wrap>
                         <Button icon={<ThunderboltOutlined />} onClick={runAutoCheck} className="rounded-lg">Run Auto-Check</Button>
+                        <Button type="primary" icon={<CheckCircleOutlined />} onClick={runAutoCheckAndCreateTasks} loading={loading} className="rounded-lg bg-green-600 border-green-600">Run Auto-Check & Create Tasks</Button>
                         <Button icon={<ReloadOutlined />} onClick={fetchConfigs} loading={loading} className="rounded-lg">Refresh</Button>
                         <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={openAdd}>Add Configuration</Button>
                     </Space>

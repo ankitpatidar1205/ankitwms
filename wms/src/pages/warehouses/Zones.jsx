@@ -127,7 +127,7 @@ export default function Zones() {
                         <p className="text-gray-500 text-sm mt-0.5">Manage warehouse zones and specialized storage areas</p>
                     </div>
                     <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setSelectedZone(null); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
-                        + Add Zone
+                        Add Zone
                     </Button>
                 </div>
 

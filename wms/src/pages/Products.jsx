@@ -6,24 +6,15 @@ import {
     EditOutlined,
     DeleteOutlined,
     EyeOutlined,
-    BarcodeOutlined,
-    InboxOutlined,
     ReloadOutlined,
-    DollarOutlined,
-    TagOutlined,
-    BoxPlotOutlined,
-    MinusCircleOutlined,
-    ShoppingCartOutlined,
     UploadOutlined,
+    ShoppingOutlined,
 } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { MainLayout } from '../components/layout/MainLayout';
 import { apiRequest } from '../api/client';
 import { formatCurrency, getStatusColor } from '../utils';
-
-const { Search } = Input;
-const { Option } = Select;
 
 export default function Products() {
     const navigate = useNavigate();
@@ -32,13 +23,17 @@ export default function Products() {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [searchText, setSearchText] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState(undefined);
+    const [statusFilter, setStatusFilter] = useState(undefined);
+    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
     const fetchProducts = useCallback(async () => {
         if (!token) return;
         try {
             setLoading(true);
-            const data = await apiRequest('/api/inventory/products', { method: 'GET' }, token);
-            setProducts(Array.isArray(data.data) ? data.data : data.data || []);
+            const res = await apiRequest('/api/inventory/products', { method: 'GET' }, token);
+            const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+            setProducts(list);
         } catch (err) {
             message.error(err?.message || err?.data?.message || 'Failed to load products');
             setProducts([]);
@@ -73,70 +68,133 @@ export default function Products() {
         fetchCategories();
     }, [fetchProducts, fetchCategories]);
 
+    const filteredProducts = products.filter((p) => {
+        const matchSearch = !searchText || (p.name && p.name.toLowerCase().includes(searchText.toLowerCase())) || (p.sku && String(p.sku).toLowerCase().includes(searchText.toLowerCase())) || (p.barcode && String(p.barcode).toLowerCase().includes(searchText.toLowerCase()));
+        const matchCategory = categoryFilter == null || p.categoryId === categoryFilter;
+        const matchStatus = statusFilter == null || (p.status || 'ACTIVE') === statusFilter;
+        return matchSearch && matchCategory && matchStatus;
+    });
+
+    const getCategoryName = (categoryId) => {
+        if (categoryId == null) return '—';
+        const c = categories.find((x) => x.id === categoryId);
+        return c ? c.name : '—';
+    };
+
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: setSelectedRowKeys,
+    };
+
     const columns = [
-        { title: 'Master SKU', dataIndex: 'sku', key: 'sku', render: (v, r) => <Link to={`/products/${r.id}`} className="text-blue-600 hover:underline">{v}</Link> },
-        { title: 'Product Identity', dataIndex: 'name', key: 'name', render: (v) => <span className="font-medium text-blue-600">{v}</span> },
-        { title: 'Barcode', dataIndex: 'barcode', key: 'barcode', render: (v) => <span className="text-gray-500 font-mono text-xs"><BarcodeOutlined /> {v || '—'}</span> },
-        { title: 'Inv Stock', key: 'stock', align: 'right', render: (_, r) => <Tag color="blue" bordered={false}>{(r.ProductStocks || r.inventory || [])?.reduce((s, i) => s + (i.quantity || 0), 0) || 0}</Tag> },
-        { title: 'Unit Price', dataIndex: 'price', key: 'price', align: 'right', render: (v) => <span className="text-slate-800">{formatCurrency(v)}</span> },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={getStatusColor(s)} className="uppercase text-xs">{s || 'ACTIVE'}</Tag> },
+        { title: 'SKU', dataIndex: 'sku', key: 'sku', width: 110, fixed: 'left', render: (v, r) => <Link to={`/products/${r.id}`} className="text-blue-600 hover:underline font-medium">{v || '—'}</Link> },
+        { title: 'Product Name', dataIndex: 'name', key: 'name', width: 180, ellipsis: true, render: (v, r) => <Link to={`/products/${r.id}`} className="text-blue-600 hover:underline">{v || '—'}</Link> },
+        { title: 'Category', key: 'category', width: 120, render: (_, r) => getCategoryName(r.categoryId) },
+        { title: 'Barcode', dataIndex: 'barcode', key: 'barcode', width: 130, render: (v) => <span className="font-mono text-xs text-gray-600">{v || '—'}</span> },
+        { title: 'Price', dataIndex: 'price', key: 'price', width: 95, align: 'right', render: (v) => <span className="font-medium">{formatCurrency(v)}</span> },
+        { title: 'Cost', dataIndex: 'costPrice', key: 'costPrice', width: 95, align: 'right', render: (v) => <span className="text-gray-600">{formatCurrency(v)}</span> },
+        { title: 'Stock', key: 'stock', width: 90, align: 'right', render: (_, r) => <span className="inline-flex items-center gap-1"><ShoppingOutlined className="text-slate-400 text-xs" />{(r.ProductStocks || r.inventory || [])?.reduce((s, i) => s + (i.quantity || 0), 0) || 0}</span> },
+        { title: 'Status', dataIndex: 'status', key: 'status', width: 95, render: (s) => <Tag color={getStatusColor(s)}>{s || 'ACTIVE'}</Tag> },
         {
-            title: 'Act',
-            key: 'act',
+            title: 'Actions',
+            key: 'actions',
+            width: 140,
+            fixed: 'right',
             render: (_, r) => (
-                <Space>
-                    <Button type="text" icon={<EyeOutlined className="text-slate-600" />} onClick={(e) => { e.stopPropagation(); navigate(`/products/${r.id}`); }} title="View" />
-                    <Button type="text" icon={<EditOutlined className="text-blue-500" />} onClick={(e) => { e.stopPropagation(); navigate(`/products/${r.id}/edit`); }} title="Edit" />
+                <Space size="small">
+                    <Button type="link" size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); navigate(`/products/${r.id}`); }} className="p-0 h-auto">View</Button>
+                    <Button type="link" size="small" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); navigate(`/products/${r.id}/edit`); }} className="p-0 h-auto">Edit</Button>
                     <Popconfirm title="Delete this product?" description="This cannot be undone." onConfirm={() => handleDelete(r.id)} okText="Delete" okButtonProps={{ danger: true }} cancelText="Cancel">
-                        <Button type="text" danger icon={<DeleteOutlined />} title="Delete" />
+                        <Button type="link" size="small" danger icon={<DeleteOutlined />} className="p-0 h-auto">Delete</Button>
                     </Popconfirm>
                 </Space>
             )
         }
     ];
 
+    const activeCount = products.filter((x) => (x.status || 'ACTIVE') === 'ACTIVE').length;
+    const inactiveCount = products.length - activeCount;
+
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-                <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="max-w-[1400px] mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-medium text-blue-600">Products</h1>
-                        <p className="text-gray-500 text-sm">Master record of all sellable entities and digital twins</p>
+                        <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Products</h1>
+                        <p className="text-gray-500 text-sm mt-1">Manage your product catalog ({filteredProducts.length} total)</p>
                     </div>
-                    <Space size="middle">
-                        <Button icon={<UploadOutlined />} onClick={() => navigate('/products/import-export')} className="h-11 px-4 rounded-xl">
-                            Import
-                        </Button>
+                    <Space size="middle" className="flex-shrink-0 flex-wrap">
+                        <Button icon={<ReloadOutlined />} onClick={fetchProducts} className="h-10 rounded-lg">Refresh</Button>
+                        <Button icon={<UploadOutlined />} onClick={() => navigate('/products/import-export')} className="h-10 rounded-lg">Import</Button>
                         <Link to="/products/add">
-                            <Button type="primary" icon={<PlusOutlined />} size="large" className="h-11 px-6 rounded-xl bg-blue-600 border-blue-600">
+                            <Button type="primary" icon={<PlusOutlined />} size="large" className="h-10 px-5 rounded-lg font-semibold bg-blue-600 border-blue-600 hover:bg-blue-700">
                                 Add Product
                             </Button>
                         </Link>
                     </Space>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <Card className="rounded-xl border-none shadow-sm"><div className="text-xs text-slate-500 mb-1">Total SKU Count</div><div className="text-xl text-slate-800">{products.length}</div></Card>
-                    <Card className="rounded-xl border-none shadow-sm"><div className="text-xs text-green-600 mb-1">Active Listing</div><div className="text-xl text-slate-800">{products.filter(x => x.status === 'ACTIVE').length}</div></Card>
-                    <Card className="rounded-xl border-none shadow-sm"><div className="text-xs text-blue-600 mb-1">Available Units</div><div className="text-xl text-slate-800">{products.reduce((s, p) => s + ((p.ProductStocks || p.inventory || [])?.reduce((ss, i) => ss + (i.quantity || 0), 0) || 0), 0)}</div></Card>
-                    <Card className="rounded-xl border-none shadow-sm"><div className="text-xs text-indigo-600 mb-1">Portfolio GTV</div><div className="text-xl text-slate-800">{formatCurrency(products.reduce((s, p) => s + ((Number(p.price) || 0) * ((p.ProductStocks || p.inventory || [])?.reduce((ss, i) => ss + (i.quantity || 0), 0) || 0)), 0))}</div></Card>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Card className="rounded-xl border border-gray-100 shadow-sm">
+                        <div className="text-sm font-medium text-slate-500">Total Products</div>
+                        <div className="text-2xl font-bold text-blue-600 mt-1">{products.length}</div>
+                    </Card>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm">
+                        <div className="text-sm font-medium text-slate-500">Active</div>
+                        <div className="text-2xl font-bold text-green-600 mt-1">{activeCount}</div>
+                    </Card>
+                    <Card className="rounded-xl border border-gray-100 shadow-sm">
+                        <div className="text-sm font-medium text-slate-500">Inactive</div>
+                        <div className="text-2xl font-bold text-red-600 mt-1">{inactiveCount}</div>
+                    </Card>
                 </div>
 
-                <Card className="rounded-xl shadow-sm border-gray-100 overflow-hidden">
-                    <div className="p-6">
-                        <div className="mb-6 flex items-center justify-between">
-                            <div className="flex gap-4">
-                                <Search placeholder="Product ID / Identity Search..." className="w-80 h-12 shadow-sm" onChange={e => setSearchText(e.target.value)} prefix={<SearchOutlined />} />
-                                <Select placeholder="Category" className="w-48 h-12 rounded-xl" allowClear>
-                                    {categories.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
-                                </Select>
+                <Card className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="p-4 sm:p-6">
+                        <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                            <div className="flex gap-2 flex-1 max-w-md">
+                                <Input
+                                    placeholder="Search by name, SKU, or barcode"
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                    onPressEnter={() => {}}
+                                    allowClear
+                                    className="rounded-lg h-10 flex-1"
+                                />
+                                <Button type="primary" icon={<SearchOutlined />} className="h-10 rounded-lg bg-blue-600 border-blue-600">Search</Button>
                             </div>
-                            <Space>
-                                <Button icon={<ReloadOutlined />} onClick={fetchProducts}>Refresh</Button>
-                                <Button icon={<UploadOutlined />} onClick={() => navigate('/products/import-export')}>Import</Button>
-                            </Space>
+                            <Select
+                                placeholder="Filter by category"
+                                allowClear
+                                value={categoryFilter}
+                                onChange={setCategoryFilter}
+                                className="min-w-[180px] rounded-lg h-10"
+                                options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                            />
+                            <Select
+                                placeholder="Filter by status"
+                                allowClear
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                className="min-w-[160px] rounded-lg h-10"
+                                options={[
+                                    { value: 'ACTIVE', label: 'Active' },
+                                    { value: 'INACTIVE', label: 'Inactive' },
+                                ]}
+                            />
                         </div>
-                        <Table className="[&_.ant-table-thead_th]:font-normal" columns={columns} dataSource={products.filter(p => !searchText || p.name.toLowerCase().includes(searchText.toLowerCase()) || p.sku.toLowerCase().includes(searchText.toLowerCase()))} rowKey="id" loading={loading} />
+
+                        <Table
+                            size="small"
+                            rowSelection={rowSelection}
+                            columns={columns}
+                            dataSource={filteredProducts}
+                            rowKey="id"
+                            loading={loading}
+                            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `Total ${t} products`, pageSizeOptions: ['10', '20', '50'] }}
+                            className="[&_.ant-table-thead_th]:bg-gray-50 [&_.ant-table-thead_th]:font-medium [&_.ant-table-thead_th]:text-slate-600"
+                            scroll={{ x: 1000, y: 420 }}
+                        />
                     </div>
                 </Card>
             </div>

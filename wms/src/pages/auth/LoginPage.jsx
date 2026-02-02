@@ -74,86 +74,85 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-            <Card className="w-full max-w-md shadow-xl rounded-2xl border-0">
-                <div className="text-center mb-8">
-                    <div className="flex justify-center mb-4">
-                        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-                            <BoxPlotOutlined className="text-3xl text-white" />
+        <div className="min-h-screen flex items-center justify-center bg-[#e8eef4] py-12 px-4 sm:px-6">
+            <div className="w-full max-w-md">
+                <Card className="shadow-lg rounded-2xl border border-gray-100 overflow-hidden" bodyStyle={{ padding: '32px 28px' }}>
+                    <div className="text-center mb-8">
+                        <div className="flex justify-center mb-4">
+                            <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                                <BoxPlotOutlined className="text-2xl text-white" />
+                            </div>
+                        </div>
+                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">{APP_NAME}</h1>
+                        <p className="mt-1.5 text-sm text-gray-500">Sign in to your account</p>
+                    </div>
+
+                    <Form name="login" onFinish={onFinish} layout="vertical" size="large" requiredMark={false}>
+                        <Form.Item name="email" label="Email" rules={[{ required: true, message: 'Enter your email' }]}>
+                            <Input
+                                prefix={<MailOutlined className="text-gray-400" />}
+                                placeholder="admin@kiaan-wms.com"
+                                type="email"
+                                className="rounded-lg"
+                            />
+                        </Form.Item>
+                        <Form.Item name="password" label="Password" rules={[{ required: true, message: 'Enter your password' }]}>
+                            <Input.Password
+                                prefix={<LockOutlined className="text-gray-400" />}
+                                placeholder="••••••••"
+                                className="rounded-lg"
+                            />
+                        </Form.Item>
+                        <Form.Item className="mb-0">
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={loading}
+                                block
+                                size="large"
+                                className="h-11 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 border-0"
+                            >
+                                Sign In
+                            </Button>
+                        </Form.Item>
+                    </Form>
+
+                    <Divider className="my-5 text-gray-400 text-xs font-medium">Quick Login (Demo)</Divider>
+                    <div className="grid grid-cols-2 gap-2.5">
+                        {QUICK_LOGIN_USERS.slice(0, 6).map((demoUser) => (
+                            <Button
+                                key={demoUser.email}
+                                size="middle"
+                                onClick={() => handleQuickLogin(demoUser)}
+                                loading={quickLoginLoading === demoUser.email}
+                                className="h-9 rounded-lg border-gray-200 bg-gray-50/80 text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                            >
+                                {demoUser.label}
+                            </Button>
+                        ))}
+                        <div className="col-span-2 flex justify-center pt-0.5">
+                            <Button
+                                size="middle"
+                                onClick={() => handleQuickLogin(QUICK_LOGIN_USERS[6])}
+                                loading={quickLoginLoading === QUICK_LOGIN_USERS[6].email}
+                                className="h-9 rounded-lg border-gray-200 bg-gray-50/80 text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 min-w-[150px] transition-colors"
+                            >
+                                {QUICK_LOGIN_USERS[6].label}
+                            </Button>
                         </div>
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900">{APP_NAME}</h1>
-                    <p className="mt-2 text-sm text-gray-600">Sign in to your account</p>
-                </div>
 
-                <Form
-                    name="login"
-                    onFinish={onFinish}
-                    layout="vertical"
-                    size="large"
-                >
-                    <Form.Item
-                        name="email"
-                        label="Email"
-                        rules={[{ required: true, message: 'Please enter your email!' }]}
-                    >
-                        <Input
-                            prefix={<MailOutlined className="text-gray-400" />}
-                            placeholder="admin@kiaan-wms.com"
-                            type="email"
-                        />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="password"
-                        label="Password"
-                        rules={[{ required: true, message: 'Please enter your password!' }]}
-                    >
-                        <Input.Password
-                            prefix={<LockOutlined className="text-gray-400" />}
-                            placeholder="••••••••"
-                        />
-                    </Form.Item>
-
-                    <Form.Item>
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            loading={loading}
-                            block
-                            size="large"
-                            className="h-12 font-semibold rounded-xl"
-                        >
-                            Sign In
-                        </Button>
-                    </Form.Item>
-                </Form>
-
-                <Divider className="my-6">Quick Login (Demo)</Divider>
-                <div className="grid grid-cols-2 gap-2">
-                    {QUICK_LOGIN_USERS.map((demoUser) => (
-                        <Button
-                            key={demoUser.email}
-                            size="small"
-                            onClick={() => handleQuickLogin(demoUser)}
-                            loading={quickLoginLoading === demoUser.email}
-                            className="rounded-lg"
-                        >
-                            {demoUser.label}
-                        </Button>
-                    ))}
-                </div>
-
-                <div className="mt-6 text-center text-sm">
-                    <Link to="/auth/register" className="text-blue-600 hover:text-blue-800 font-medium">
-                        Create account
-                    </Link>
-                    <span className="mx-2 text-gray-300">|</span>
-                    <Link to="/auth/forgot-password" className="text-gray-500 hover:text-gray-700">
-                        Forgot password?
-                    </Link>
-                </div>
-            </Card>
+                    <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center gap-3 text-sm">
+                        <Link to="/auth/register" className="text-blue-600 hover:text-blue-700 font-medium">
+                            Create account
+                        </Link>
+                        <span className="text-gray-300 select-none">|</span>
+                        <Link to="/auth/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium">
+                            Forgot password?
+                        </Link>
+                    </div>
+                </Card>
+            </div>
         </div>
     );
 }

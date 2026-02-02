@@ -342,6 +342,18 @@ export default function PurchaseOrders() {
     const columns = [
         { title: 'PO Number', dataIndex: 'poNumber', key: 'poNumber', width: 120, render: (v) => <span className="font-medium text-blue-600">{v}</span> },
         { title: 'Supplier', dataIndex: 'supplier', key: 'supplier', width: 160 },
+        {
+            title: 'Products',
+            key: 'products',
+            width: 220,
+            ellipsis: true,
+            render: (_, r) => {
+                const names = (r.items || []).map((i) => i.productName || i.productSku || `Product #${i.productId}`).filter(Boolean);
+                if (names.length === 0) return '—';
+                if (names.length <= 2) return names.join(', ');
+                return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
+            },
+        },
         { title: 'Status', dataIndex: 'status', key: 'status', width: 110, render: (s) => <Tag color={poStatusColor(s)}>{s}</Tag> },
         { title: 'Items', key: 'items', width: 80, align: 'center', render: (_, r) => (r.items || []).length },
         { title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount', width: 120, render: (v) => formatCurrency(v) },
@@ -438,18 +450,22 @@ export default function PurchaseOrders() {
                         </div>
                         <div className="border border-dashed border-gray-200 rounded-xl p-4 bg-gray-50/50 mt-2">
                             <h4 className="font-medium mb-3 flex items-center gap-2 text-gray-700">
-                                <ShoppingCartOutlined /> Add Products/Bundles
+                                <ShoppingCartOutlined /> Add Products (select by name or SKU)
                             </h4>
-                            <Select showSearch placeholder="Search and select products..." allowClear value={productSelectValue} onChange={(val) => { if (val) { const p = products.find((x) => x.id === val); if (p) addItem(p); } }} onClear={() => setProductSelectValue(undefined)} className="w-full rounded-lg mb-4" optionFilterProp="label" filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))} />
+                            <Select showSearch placeholder="Search by product name or SKU, then select..." allowClear value={productSelectValue} onChange={(val) => { if (val) { const p = products.find((x) => x.id === val); if (p) addItem(p); } }} onClear={() => setProductSelectValue(undefined)} className="w-full rounded-lg mb-4" optionFilterProp="label" filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} options={products.map((p) => ({ value: p.id, label: `${p.name || 'Unnamed'} (SKU: ${p.sku || '—'})` }))} />
                             {selectedItems.length > 0 ? (
                                 <div className="space-y-2">
+                                    <div className="text-xs text-gray-500 font-medium uppercase">Selected products</div>
                                     {selectedItems.map((item) => (
                                         <div key={item.productId} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-100">
                                             <div className="flex-1">
-                                                <div className="font-medium text-gray-800">{item.productName}</div>
-                                                <div className="text-xs text-gray-500">{item.productSku}</div>
+                                                <div className="font-medium text-gray-800">{item.productName || `Product #${item.productId}`}</div>
+                                                <div className="text-xs text-gray-500">SKU: {item.productSku || '—'}</div>
                                             </div>
-                                            <InputNumber min={1} value={item.quantity} onChange={(v) => updateItemQuantity(item.productId, v || 1)} className="w-20 rounded-lg" />
+                                            <div className="flex flex-col items-center gap-0.5">
+                                                <span className="text-xs text-gray-500 whitespace-nowrap">Qty (units)</span>
+                                                <InputNumber min={1} value={item.quantity} onChange={(v) => updateItemQuantity(item.productId, v || 1)} className="w-20 rounded-lg" />
+                                            </div>
                                             <span className="text-gray-500 whitespace-nowrap">x {formatCurrency(item.unitPrice)}</span>
                                             <span className="font-medium w-20 text-right">{formatCurrency(item.totalPrice)}</span>
                                             <Button type="text" danger size="small" icon={<MinusCircleOutlined />} onClick={() => removeItem(item.productId)} />
@@ -499,18 +515,22 @@ export default function PurchaseOrders() {
                         </div>
                         <div className="border border-dashed border-gray-200 rounded-xl p-4 bg-gray-50/50 mt-2">
                             <h4 className="font-medium mb-3 flex items-center gap-2 text-gray-700">
-                                <ShoppingCartOutlined /> Add Products/Bundles
+                                <ShoppingCartOutlined /> Add Products (select by name or SKU)
                             </h4>
-                            <Select showSearch placeholder="Search and select products..." allowClear value={productSelectValue} onChange={(val) => { if (val) { const p = products.find((x) => x.id === val); if (p) addItem(p); } }} onClear={() => setProductSelectValue(undefined)} className="w-full rounded-lg mb-4" optionFilterProp="label" filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))} />
+                            <Select showSearch placeholder="Search by product name or SKU, then select..." allowClear value={productSelectValue} onChange={(val) => { if (val) { const p = products.find((x) => x.id === val); if (p) addItem(p); } }} onClear={() => setProductSelectValue(undefined)} className="w-full rounded-lg mb-4" optionFilterProp="label" filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} options={products.map((p) => ({ value: p.id, label: `${p.name || 'Unnamed'} (SKU: ${p.sku || '—'})` }))} />
                             {selectedItems.length > 0 ? (
                                 <div className="space-y-2">
+                                    <div className="text-xs text-gray-500 font-medium uppercase">Selected products</div>
                                     {selectedItems.map((item) => (
                                         <div key={item.productId} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-100">
                                             <div className="flex-1">
-                                                <div className="font-medium text-gray-800">{item.productName}</div>
-                                                <div className="text-xs text-gray-500">{item.productSku}</div>
+                                                <div className="font-medium text-gray-800">{item.productName || `Product #${item.productId}`}</div>
+                                                <div className="text-xs text-gray-500">SKU: {item.productSku || '—'}</div>
                                             </div>
-                                            <InputNumber min={1} value={item.quantity} onChange={(v) => updateItemQuantity(item.productId, v || 1)} className="w-20 rounded-lg" />
+                                            <div className="flex flex-col items-center gap-0.5">
+                                                <span className="text-xs text-gray-500 whitespace-nowrap">Qty (units)</span>
+                                                <InputNumber min={1} value={item.quantity} onChange={(v) => updateItemQuantity(item.productId, v || 1)} className="w-20 rounded-lg" />
+                                            </div>
                                             <span className="text-gray-500 whitespace-nowrap">x {formatCurrency(item.unitPrice)}</span>
                                             <span className="font-medium w-20 text-right">{formatCurrency(item.totalPrice)}</span>
                                             <Button type="text" danger size="small" icon={<MinusCircleOutlined />} onClick={() => removeItem(item.productId)} />
@@ -545,7 +565,10 @@ export default function PurchaseOrders() {
                             </div>
                             <List dataSource={selectedPO.items || []} renderItem={item => (
                                 <List.Item className="px-0 flex justify-between">
-                                    <div><div className="font-bold">{item.productName}</div><div className="text-xs text-gray-400">Qty: {item.quantity} x {formatCurrency(item.unitPrice)}</div></div>
+                                    <div>
+                                        <div className="font-bold">{item.productName || item.productSku || `Product #${item.productId}`}</div>
+                                        <div className="text-xs text-gray-400">SKU: {item.productSku || '—'} · Qty: {item.quantity} x {formatCurrency(item.unitPrice)}</div>
+                                    </div>
                                     <div className="font-black text-blue-600">{formatCurrency(item.totalPrice)}</div>
                                 </List.Item>
                             )} />

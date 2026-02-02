@@ -1,4 +1,5 @@
-const { GoodsReceipt, GoodsReceiptItem, PurchaseOrder, PurchaseOrderItem, Supplier, Product } = require('../models');
+const { Op } = require('sequelize');
+const { GoodsReceipt, GoodsReceiptItem, PurchaseOrder, PurchaseOrderItem, Supplier, Product, ProductStock, Warehouse } = require('../models');
 
 async function list(reqUser, query = {}) {
   const where = {};
@@ -17,7 +18,28 @@ async function list(reqUser, query = {}) {
       { association: 'GoodsReceiptItems', include: [{ association: 'Product', attributes: ['id', 'name', 'sku'] }] },
     ],
   });
+  applyGrnDisplayNormalization(receipts);
   return receipts;
+}
+
+function applyGrnDisplayNormalization(receipts) {
+  const byCompany = {};
+  receipts.forEach((r) => {
+    const cid = r.companyId;
+    if (!byCompany[cid]) byCompany[cid] = [];
+    byCompany[cid].push(r);
+  });
+  Object.values(byCompany).forEach((arr) => {
+    const newFormatNums = arr.map((r) => (r.grNumber || '').match(/^GRN(\d+)$/i)).filter(Boolean).map((m) => parseInt(m[1], 10));
+    const nextNum = newFormatNums.length > 0 ? Math.max(...newFormatNums) + 1 : 1;
+    const oldFormat = arr.filter((r) => /^GRN-\d+-\d+$/i.test((r.grNumber || '').trim()));
+    const oldSorted = [...oldFormat].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    let n = nextNum;
+    oldSorted.forEach((r) => {
+      r.setDataValue('grNumber', `GRN${String(n).padStart(3, '0')}`);
+      n += 1;
+    });
+  });
 }
 
 async function getById(id, reqUser) {
@@ -29,6 +51,12 @@ async function getById(id, reqUser) {
   });
   if (!gr) throw new Error('Goods receipt not found');
   if (reqUser.role !== 'super_admin' && gr.companyId !== reqUser.companyId) throw new Error('Goods receipt not found');
+  if (/^GRN-\d+-\d+$/i.test((gr.grNumber || '').trim())) {
+    const all = await GoodsReceipt.findAll({ where: { companyId: gr.companyId }, order: [['createdAt', 'ASC']] });
+    applyGrnDisplayNormalization(all);
+    const found = all.find((r) => r.id === gr.id);
+    if (found) gr.setDataValue('grNumber', found.grNumber);
+  }
   return gr;
 }
 
@@ -37,13 +65,16 @@ async function create(body, reqUser) {
   if (!companyId) throw new Error('Company context required');
 
   const po = await PurchaseOrder.findByPk(body.purchaseOrderId, {
-    include: [{ association: 'PurchaseOrderItems' }],
+    include: [{ association: 'PurchaseOrderItems', include: [{ association: 'Product', attributes: ['id', 'name', 'sku'] }] }],
   });
   if (!po || po.companyId !== companyId) throw new Error('Purchase order not found');
   if ((po.status || '').toLowerCase() !== 'approved') throw new Error('Only approved purchase orders can be received');
 
-  const count = await GoodsReceipt.count({ where: { companyId } });
-  const grNumber = `GRN-${Date.now()}-${String(count + 1).padStart(4, '0')}`;
+  // GRN number format: GRN001, GRN002, GRN003, ... (sequential per company)
+  const all = await GoodsReceipt.findAll({ where: { companyId }, attributes: ['grNumber'], raw: true });
+  const existingNums = all.map((r) => (r.grNumber || '').match(/^GRN(\d+)$/i)).filter(Boolean).map((m) => parseInt(m[1], 10));
+  const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+  const grNumber = `GRN${String(nextNum).padStart(3, '0')}`;
 
   const totalExpected = (po.PurchaseOrderItems || []).reduce((s, i) => s + (Number(i.quantity) || 0), 0);
 
@@ -60,8 +91,8 @@ async function create(body, reqUser) {
   const items = (po.PurchaseOrderItems || []).map((i) => ({
     goodsReceiptId: gr.id,
     productId: i.productId,
-    productName: i.productName || null,
-    productSku: i.productSku || null,
+    productName: (i.productName && i.productName.trim()) ? i.productName.trim() : (i.Product?.name || null),
+    productSku: (i.productSku && i.productSku.trim()) ? i.productSku.trim() : (i.Product?.sku || null),
     expectedQty: Number(i.quantity) || 0,
     receivedQty: 0,
     qualityStatus: null,
@@ -76,6 +107,12 @@ async function updateReceived(id, body, reqUser) {
   if (!gr) throw new Error('Goods receipt not found');
   if (reqUser.role !== 'super_admin' && gr.companyId !== reqUser.companyId) throw new Error('Goods receipt not found');
   if (gr.status === 'completed') throw new Error('Receipt already completed');
+
+  // Keep old values to compute delta for stock update (partial receive should also update stock)
+  const oldByProduct = {};
+  (gr.GoodsReceiptItems || []).forEach((l) => {
+    oldByProduct[l.productId] = { receivedQty: Number(l.receivedQty) || 0, qualityStatus: (l.qualityStatus || '').toUpperCase() };
+  });
 
   const items = body.items || [];
   for (const row of items) {
@@ -93,7 +130,51 @@ async function updateReceived(id, body, reqUser) {
     status: allReceived ? 'completed' : 'in_progress',
   });
 
-  return getById(gr.id, reqUser);
+  // Add received quantity (delta) to stock — existing inventory record update karo, naya sirf jab koi record na ho.
+  const companyWarehouses = await Warehouse.findAll({ where: { companyId: updated.companyId }, attributes: ['id'], order: [['id', 'ASC']] });
+  const warehouseIds = (companyWarehouses || []).map((w) => w.id);
+  const defaultWarehouseId = warehouseIds.length > 0 ? warehouseIds[0] : null;
+  let stockUpdated = false;
+  let stockWarning = null;
+  if (!defaultWarehouseId && (updated.GoodsReceiptItems || []).some((i) => (Number(i.receivedQty) || 0) > 0)) {
+    stockWarning = 'No warehouse found. Create a warehouse (Warehouses → Add Warehouse) to update inventory stock.';
+  }
+  if (warehouseIds.length > 0 && (updated.GoodsReceiptItems || []).length > 0) {
+    for (const line of updated.GoodsReceiptItems) {
+      const pid = Number(line.productId) || line.productId;
+      const newReceived = Number(line.receivedQty) || 0;
+      const old = oldByProduct[pid] || oldByProduct[line.productId] || { receivedQty: 0, qualityStatus: '' };
+      const delta = newReceived - (Number(old.receivedQty) || 0);
+      if (delta <= 0) continue;
+      const quality = (line.qualityStatus || '').toUpperCase();
+      const qtyToAdd = quality === 'DAMAGED' ? 0 : delta;
+      if (qtyToAdd <= 0) continue;
+      try {
+        // Pehle is product ka koi existing stock record dhoondo (company ke kisi bhi warehouse me) — naya record mat banao jab tak existing na mile
+        let stock = await ProductStock.findOne({
+          where: { productId: pid, warehouseId: { [Op.in]: warehouseIds } },
+        });
+        if (stock) {
+          await stock.update({ quantity: (Number(stock.quantity) || 0) + qtyToAdd });
+        } else {
+          await ProductStock.create({
+            productId: pid,
+            warehouseId: defaultWarehouseId,
+            quantity: qtyToAdd,
+            reserved: 0,
+            status: 'ACTIVE',
+          });
+        }
+        stockUpdated = true;
+      } catch (err) {
+        stockWarning = (stockWarning ? stockWarning + ' ' : '') + (err.message || 'Stock update failed.');
+      }
+    }
+  }
+
+  const result = await getById(gr.id, reqUser);
+  const plain = result.get ? result.get({ plain: true }) : (result.toJSON ? result.toJSON() : result);
+  return { ...plain, stockUpdated: !!stockUpdated, stockWarning: stockWarning || undefined };
 }
 
 async function remove(id, reqUser) {

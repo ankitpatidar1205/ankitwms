@@ -14,6 +14,7 @@ const Customer = sequelize.define('Customer', {
   state: { type: DataTypes.STRING, allowNull: true },
   city: { type: DataTypes.STRING, allowNull: true },
   address: { type: DataTypes.TEXT, allowNull: true },
+  postcode: { type: DataTypes.STRING, allowNull: true },
   tier: { type: DataTypes.STRING, allowNull: true }, // Gold, Premium, Standard, etc.
   segment: { type: DataTypes.STRING, allowNull: true },
   creditLimit: { type: DataTypes.DECIMAL(15, 2), allowNull: true, defaultValue: 0 },

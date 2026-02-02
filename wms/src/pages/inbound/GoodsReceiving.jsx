@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Input, Select, Tag, Card, Modal, Form, message, Drawer, Space, InputNumber, Progress, Popconfirm, Tooltip, Divider, Typography } from 'antd';
+import { Table, Button, Input, Select, Tag, Card, Modal, Form, message, Drawer, Space, InputNumber, Progress, Popconfirm, Tooltip, Divider, Typography, Alert } from 'antd';
 import {
     SearchOutlined,
     ReloadOutlined,
@@ -11,6 +11,7 @@ import {
     InfoCircleOutlined,
     TruckOutlined,
 } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 import { formatDate, getStatusColor } from '../../utils';
 import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../../components/layout/MainLayout';
@@ -39,6 +40,7 @@ export default function GoodsReceiving() {
     const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [statusFilter, setStatusFilter] = useState(undefined);
+    const [selectedPOForCreate, setSelectedPOForCreate] = useState(null);
     const [form] = Form.useForm();
     const [receiveForm] = Form.useForm();
 
@@ -113,6 +115,7 @@ export default function GoodsReceiving() {
             }, token);
             message.success('GRN created!');
             setCreateModalOpen(false);
+            setSelectedPOForCreate(null);
             form.resetFields();
             fetchReceipts();
         } catch (err) {
@@ -148,12 +151,21 @@ export default function GoodsReceiving() {
                     qualityStatus: item?.qualityStatus || 'GOOD',
                 };
             });
-            await apiRequest(
+            const res = await apiRequest(
                 `/api/goods-receiving/${selectedReceipt.id}/receive`,
                 { method: 'PUT', body: JSON.stringify({ items }) },
                 token
             );
-            message.success('Stock received and updated!');
+            const data = res?.data ?? res;
+            if (data?.stockWarning) message.warning(data.stockWarning, 6);
+            if (data?.stockUpdated) {
+                message.success(
+                    <span>Received quantity added to stock. View: <Link to="/inventory">Stock Overview (Inventory)</Link> or <Link to="/products">Products</Link> → Stock column.</span>,
+                    6
+                );
+            } else {
+                message.success('Receipt updated.');
+            }
             setReceiveModalOpen(false);
             setSelectedReceipt(null);
             fetchReceipts();
@@ -213,7 +225,19 @@ export default function GoodsReceiving() {
         { title: 'PO Number', dataIndex: 'poNumber', key: 'poNumber', width: 120 },
         { title: 'Supplier', dataIndex: 'supplier', key: 'supplier', width: 140 },
         {
-            title: 'Expected',
+            title: 'Products',
+            key: 'products',
+            width: 200,
+            ellipsis: true,
+            render: (_, r) => {
+                const names = (r.items || []).map((i) => i.productName || i.productSku || `#${i.productId}`).filter(Boolean);
+                if (names.length === 0) return '—';
+                if (names.length <= 2) return names.join(', ');
+                return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
+            },
+        },
+        {
+            title: 'Expected (units)',
             dataIndex: 'totalExpected',
             key: 'expected',
             width: 100,
@@ -230,7 +254,7 @@ export default function GoodsReceiving() {
             ),
         },
         {
-            title: 'Received',
+            title: 'Received (units)',
             dataIndex: 'totalReceived',
             key: 'received',
             width: 160,
@@ -434,9 +458,9 @@ export default function GoodsReceiving() {
                 <Modal
                     title="Receive Goods"
                     open={createModalOpen}
-                    onCancel={() => setCreateModalOpen(false)}
+                    onCancel={() => { setCreateModalOpen(false); setSelectedPOForCreate(null); }}
                     footer={null}
-                    width={520}
+                    width={560}
                     className="rounded-xl"
                 >
                     <Form form={form} layout="vertical" onFinish={handleCreate} className="pt-2">
@@ -446,14 +470,43 @@ export default function GoodsReceiving() {
                             rules={[{ required: true, message: 'Select an approved PO' }]}
                         >
                             <Select
-                                placeholder="Select approved PO to receive"
-                                className="rounded-lg"
-                                options={approvedPOs.map((po) => ({
-                                    value: po.id,
-                                    label: `${po.poNumber || po.id} - ${po.supplier?.name || '-'}`,
-                                }))}
-                            />
+                                placeholder="Select approved PO to receive (PO number, supplier & product names shown)"
+                                className="rounded-lg w-full"
+                                optionLabelProp="label"
+                                onChange={(val) => {
+                                    const po = approvedPOs.find((p) => p.id === val);
+                                    setSelectedPOForCreate(po || null);
+                                }}
+                            >
+                                {approvedPOs.map((po) => {
+                                    const supplierName = po.supplier?.name || po.Supplier?.name || '-';
+                                    const names = (po.PurchaseOrderItems || []).map((i) => i.productName || i.Product?.name || i.productSku || i.Product?.sku || `#${i.productId}`).filter(Boolean);
+                                    const productLabel = names.length ? names.join(', ') : 'No products';
+                                    const shortLabel = `${po.poNumber || po.id} - ${supplierName} · ${(po.PurchaseOrderItems || []).length} items`;
+                                    return (
+                                        <Option key={po.id} value={po.id} label={shortLabel}>
+                                            <div className="py-0.5">
+                                                <div className="font-medium text-gray-900">{po.poNumber || po.id} — {supplierName}</div>
+                                                <div className="text-xs text-gray-600 mt-0.5">Products: {productLabel}</div>
+                                            </div>
+                                        </Option>
+                                    );
+                                })}
+                            </Select>
                         </Form.Item>
+                        {selectedPOForCreate && (selectedPOForCreate.PurchaseOrderItems || []).length > 0 && (
+                            <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <div className="text-xs font-medium text-gray-500 uppercase mb-2">Products in this PO (will be received)</div>
+                                <ul className="space-y-1.5 text-sm text-gray-800">
+                                    {(selectedPOForCreate.PurchaseOrderItems || []).map((item, idx) => (
+                                        <li key={item.id || idx} className="flex justify-between">
+                                            <span className="font-medium">{item.productName || item.Product?.name || `Product #${item.productId}`}</span>
+                                            <span className="text-gray-500">SKU: {item.productSku || item.Product?.sku || '—'} · Qty: {item.quantity ?? 0}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                         <Form.Item label="Notes (Optional)" name="notes">
                             <Input.TextArea rows={3} placeholder="Add any notes..." className="rounded-lg" />
                         </Form.Item>
@@ -494,15 +547,15 @@ export default function GoodsReceiving() {
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-medium text-gray-800">
-                                                    {receiveForm.getFieldValue(['items', name, 'productName'])}
+                                                    {receiveForm.getFieldValue(['items', name, 'productName']) || selectedReceipt?.items?.[name]?.productName || selectedReceipt?.items?.[name]?.productSku || `Product #${selectedReceipt?.items?.[name]?.productId ?? ''}`}
                                                 </div>
                                                 <div className="text-xs text-gray-500">
-                                                    {receiveForm.getFieldValue(['items', name, 'productSku'])}
+                                                    SKU: {receiveForm.getFieldValue(['items', name, 'productSku']) || selectedReceipt?.items?.[name]?.productSku || '—'}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4 flex-shrink-0">
                                                 <div className="text-center">
-                                                    <div className="text-xs text-gray-500 font-medium">Expected</div>
+                                                    <div className="text-xs text-gray-500 font-medium">Expected (units)</div>
                                                     <div className="font-medium">
                                                         {receiveForm.getFieldValue(['items', name, 'expectedQty'])}
                                                     </div>
@@ -511,7 +564,7 @@ export default function GoodsReceiving() {
                                                     {...restField}
                                                     name={[name, 'receivedQty']}
                                                     className="mb-0"
-                                                    label={<span className="text-xs">Received</span>}
+                                                    label={<span className="text-xs">Received (units)</span>}
                                                 >
                                                     <InputNumber min={0} className="w-20 rounded-lg" />
                                                 </Form.Item>
@@ -576,20 +629,20 @@ export default function GoodsReceiving() {
                                 pagination={false}
                                 rowKey="id"
                                 columns={[
-                                    { title: 'Product', dataIndex: 'productName', key: 'productName' },
+                                    { title: 'Product', dataIndex: 'productName', key: 'productName', render: (v, r) => v || r.productSku || `#${r.productId}` },
                                     { title: 'SKU', dataIndex: 'productSku', key: 'productSku', width: 100 },
                                     {
-                                        title: 'Expected',
+                                        title: 'Expected (units)',
                                         dataIndex: 'expectedQty',
                                         key: 'expectedQty',
-                                        width: 80,
+                                        width: 100,
                                         align: 'center',
                                     },
                                     {
-                                        title: 'Received',
+                                        title: 'Received (units)',
                                         dataIndex: 'receivedQty',
                                         key: 'receivedQty',
-                                        width: 80,
+                                        width: 110,
                                         align: 'center',
                                     },
                                     {

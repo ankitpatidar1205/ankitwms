@@ -26,8 +26,9 @@ export default function Adjustments() {
   const { token } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [adjustments, setAdjustments] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
+const [products, setProducts] = useState([]);
+    const [warehouses, setWarehouses] = useState([]);
+    const [modalOpen, setModalOpen] = useState(false);
   const [viewingAdjustment, setViewingAdjustment] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('all');
@@ -51,21 +52,32 @@ export default function Adjustments() {
     }
   }, [token, activeTab, searchText]);
 
-  const fetchProducts = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await apiRequest('/api/inventory/products', { method: 'GET' }, token);
-      setProducts(Array.isArray(res?.data) ? res.data : []);
-    } catch (_) {
-      setProducts([]);
-    }
-  }, [token]);
+const fetchProducts = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await apiRequest('/api/inventory/products', { method: 'GET' }, token);
+            setProducts(Array.isArray(res?.data) ? res.data : []);
+        } catch (_) {
+            setProducts([]);
+        }
+    }, [token]);
+
+    const fetchWarehouses = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await apiRequest('/api/warehouses', { method: 'GET' }, token);
+            setWarehouses(Array.isArray(res?.data) ? res.data : []);
+        } catch (_) {
+            setWarehouses([]);
+        }
+    }, [token]);
 
   useEffect(() => {
     if (token) {
       fetchProducts();
+      fetchWarehouses();
     }
-  }, [token, fetchProducts]);
+  }, [token, fetchProducts, fetchWarehouses]);
 
   useEffect(() => {
     if (token) fetchAdjustments();
@@ -79,6 +91,7 @@ export default function Adjustments() {
           type: values.adjustmentType,
           productId: values.productId,
           quantity: values.quantity,
+          warehouseId: values.warehouseId || undefined,
           reason: values.reason,
           notes: values.notes || undefined,
         }),
@@ -119,9 +132,9 @@ export default function Adjustments() {
       render: (v) => (v === 'INCREASE' ? <Tag color="green">Increase</Tag> : <Tag color="red">Decrease</Tag>),
     },
     {
-      title: 'Quantity',
+      title: 'Quantity (units)',
       key: 'qty',
-      width: 100,
+      width: 120,
       align: 'right',
       render: (_, r) => r.quantity ?? r.items?.reduce((s, i) => s + (i.quantity || 0), 0) ?? '—',
     },
@@ -260,6 +273,8 @@ export default function Adjustments() {
                 <div>{formatDate(viewingAdjustment.createdAt)}</div>
                 <div className="text-gray-500">Product</div>
                 <div>{viewingAdjustment.items?.[0]?.product?.name ?? viewingAdjustment.Product?.name ?? '—'}</div>
+                <div className="text-gray-500">Warehouse</div>
+                <div>{viewingAdjustment.Warehouse?.name ?? viewingAdjustment.warehouseId ? `#${viewingAdjustment.warehouseId}` : '—'}</div>
                 <div className="text-gray-500">Type</div>
                 <div>{viewingAdjustment.type === 'INCREASE' ? <Tag color="green">Increase</Tag> : <Tag color="red">Decrease</Tag>}</div>
                 <div className="text-gray-500">Quantity</div>
@@ -310,6 +325,14 @@ export default function Adjustments() {
                 optionFilterProp="label"
                 filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                 options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku || p.id})` }))}
+              />
+            </Form.Item>
+            <Form.Item label="Warehouse (Optional)" name="warehouseId">
+              <Select
+                placeholder="Select warehouse (optional)"
+                allowClear
+                className="rounded-lg"
+                options={warehouses.map((w) => ({ value: w.id, label: w.name || w.code || `Warehouse #${w.id}` }))}
               />
             </Form.Item>
             <Form.Item

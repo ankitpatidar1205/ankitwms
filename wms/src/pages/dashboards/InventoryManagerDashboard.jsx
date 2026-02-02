@@ -77,14 +77,12 @@ export default function InventoryManagerDashboard() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="space-y-8 animate-in fade-in duration-300">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-3">
-                        <DatabaseOutlined className="text-purple-500" /> Inventory Manager
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <DatabaseOutlined className="text-purple-500" /> Inventory Manager Dashboard
                     </h1>
-                    <p className="text-gray-500 font-bold text-xs uppercase tracking-widest leading-loose mt-1">
-                        Stock control • Product setup • Inventory accuracy
-                    </p>
+                    <p className="text-gray-500 text-sm mt-0.5">Stock control • Product setup • Inventory accuracy</p>
                 </div>
 
                 <Row gutter={[16, 16]}>
@@ -104,7 +102,7 @@ export default function InventoryManagerDashboard() {
 
                 <Row gutter={[16, 16]}>
                     <Col xs={24} lg={12}>
-                        <Card title={<span className="font-bold">Low Stock Alerts</span>} className="rounded-2xl shadow-sm">
+                        <Card title={<span className="font-semibold text-gray-800">Low Stock Alerts</span>} className="rounded-xl border border-gray-100 shadow-sm">
                             <Table
                                 dataSource={lowStockList}
                                 columns={[
@@ -116,11 +114,11 @@ export default function InventoryManagerDashboard() {
                                 size="small"
                                 rowKey="id"
                             />
-                            <Link to="/inventory" className="text-blue-600 font-medium text-sm mt-2 inline-block">View all →</Link>
+                            <Link to="/inventory" className="text-blue-600 font-medium text-sm mt-2 inline-block hover:underline">View all →</Link>
                         </Card>
                     </Col>
                     <Col xs={24} lg={12}>
-                        <Card title={<span className="font-bold">Today Stock Movements</span>} className="rounded-2xl shadow-sm">
+                        <Card title={<span className="font-semibold text-gray-800">Today Stock Movements</span>} className="rounded-xl border border-gray-100 shadow-sm">
                             <Table
                                 dataSource={todayMovements}
                                 columns={[
@@ -133,17 +131,17 @@ export default function InventoryManagerDashboard() {
                                 rowKey="id"
                                 locale={{ emptyText: 'No movement data from API yet' }}
                             />
-                            <Link to="/inventory/movements" className="text-blue-600 font-medium text-sm mt-2 inline-block">Movement history →</Link>
+                            <Link to="/inventory/movements" className="text-blue-600 font-medium text-sm mt-2 inline-block hover:underline">Movement history →</Link>
                         </Card>
                     </Col>
                 </Row>
 
-                <Card title={<span className="font-black uppercase tracking-tight">Quick Links</span>} className="rounded-2xl shadow-sm border-slate-100">
+                <Card title={<span className="font-semibold text-gray-800">Quick Links</span>} className="rounded-xl border border-gray-100 shadow-sm">
                     <Row gutter={[12, 12]}>
                         {quickLinks.map((link, i) => (
                             <Col xs={12} sm={8} md={6} key={i}>
                                 <Link to={link.to}>
-                                    <div className="flex items-center gap-2 p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/50 transition-all">
+                                    <div className="flex items-center gap-2 p-3 rounded-lg border border-gray-100 hover:border-purple-200 hover:bg-purple-50/50 transition-all">
                                         {link.icon}
                                         <span className="font-medium text-slate-700 text-sm">{link.label}</span>
                                         <ArrowRightOutlined className="text-gray-400 ml-auto text-xs" />
