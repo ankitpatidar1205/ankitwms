@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Tag, Tabs, Card, Input, InputNumber, Space, Modal, Form, Select, DatePicker, Drawer, Alert, Popconfirm, message } from 'antd';
+import { Table, Button, Tag, Tabs, Card, Input, InputNumber, Space, Modal, Form, Select, DatePicker, Drawer, Alert, Popconfirm, message, Tooltip } from 'antd';
 import {
     PlusOutlined, InboxOutlined, CheckCircleOutlined, WarningOutlined, StopOutlined,
-    SearchOutlined, ExportOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ReloadOutlined, HomeOutlined, EnvironmentOutlined
+    SearchOutlined, ExportOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ReloadOutlined, HomeOutlined, EnvironmentOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuthStore } from '../store/authStore';
 import { MainLayout } from '../components/layout/MainLayout';
 import { apiRequest } from '../api/client';
 import { formatNumber } from '../utils';
+
+dayjs.extend(relativeTime);
 
 const { Search } = Input;
 const { Option } = Select;
@@ -169,11 +172,41 @@ export default function Inventory() {
         { title: 'Product Name', dataIndex: ['product', 'name'], key: 'name', width: 200, render: (v) => <span className="flex items-center gap-2"><InboxOutlined className="text-gray-400" />{v || '—'}</span> },
         { title: 'Warehouse', dataIndex: ['warehouse', 'name'], key: 'warehouse', width: 150, render: (v, r) => r.warehouse ? <span className="flex items-center gap-2"><HomeOutlined className="text-gray-400" />{r.warehouse.name}</span> : '—' },
         { title: 'Location', key: 'location', width: 120, render: (_, r) => r.location ? <span className="flex items-center gap-2"><EnvironmentOutlined className="text-gray-400" />{r.location.name || r.location.code || '—'}</span> : '—' },
-        { title: 'Quantity', dataIndex: 'quantity', key: 'quantity', width: 90, align: 'right', render: (q) => formatNumber(q ?? 0) },
+        { title: 'Quantity', dataIndex: 'quantity', key: 'quantity', width: 90, align: 'right', render: (q) => <span className="font-bold">{formatNumber(q ?? 0)}</span> },
         { title: 'Available', key: 'available', width: 90, align: 'right', render: (_, r) => formatNumber(Math.max(0, (r.quantity || 0) - (r.reserved || 0))) },
         { title: 'Reserved', dataIndex: 'reserved', key: 'reserved', width: 90, align: 'right', render: (v) => formatNumber(v ?? 0) },
+        {
+            title: 'Stock Status',
+            key: 'stockStatus',
+            width: 120,
+            render: (_, record) => {
+                const available = Math.max(0, (record.quantity || 0) - (record.reserved || 0));
+                let color = 'green';
+                let text = 'In Stock';
+                if (available <= 0) {
+                    color = 'red';
+                    text = 'Out of Stock';
+                } else if (available <= 50) {
+                    color = 'orange';
+                    text = 'Low Stock';
+                }
+                return <Tag color={color}>{text}</Tag>;
+            }
+        },
+        { 
+            title: 'Last Movement', 
+            dataIndex: 'updatedAt', 
+            key: 'updatedAt', 
+            width: 140, 
+            render: (v) => v ? (
+                <Tooltip title={dayjs(v).format('DD MMM YYYY, HH:mm')}>
+                    <span className="text-xs text-gray-500 cursor-help flex items-center gap-1">
+                        <ClockCircleOutlined /> {dayjs(v).fromNow()}
+                    </span>
+                </Tooltip>
+            ) : '—' 
+        },
         { title: 'Status', dataIndex: 'status', key: 'status', width: 100, render: (v) => <Tag color={v === 'ACTIVE' ? 'green' : 'default'}>{v || 'ACTIVE'}</Tag> },
-        { title: 'Lot Number', dataIndex: 'lotNumber', key: 'lotNumber', width: 100, ellipsis: true, render: (v) => v || '—' },
         {
             title: 'Actions',
             key: 'actions',
@@ -181,15 +214,30 @@ export default function Inventory() {
             fixed: 'right',
             render: (_, record) => (
                 <Space>
-                    <Button type="link" size="small" icon={<EyeOutlined />} className="text-blue-600 p-0 font-normal" onClick={() => { setSelectedInventory(record); setViewMode(true); setModalOpen(true); setFormValues(record); }}>View</Button>
-                    <Button type="text" size="small" icon={<EditOutlined className="text-blue-600" />} onClick={() => { setSelectedInventory(record); setViewMode(false); setFormValues(record); setModalOpen(true); }} />
-                    <Popconfirm title="Delete this record?" onConfirm={() => handleDelete(record.id)} okText="Yes" cancelText="No">
-                        <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
+                    <Tooltip title="View Details">
+                        <Button type="link" size="small" icon={<EyeOutlined />} className="text-blue-600 p-0 font-normal" onClick={() => { setSelectedInventory(record); setViewMode(true); setModalOpen(true); setFormValues(record); }} />
+                    </Tooltip>
+                    <Tooltip title="Edit Stock">
+                        <Button type="text" size="small" icon={<EditOutlined className="text-blue-600" />} onClick={() => { setSelectedInventory(record); setViewMode(false); setFormValues(record); setModalOpen(true); }} />
+                    </Tooltip>
+                    <Tooltip title="Delete Record">
+                        <Popconfirm title="Delete this record?" onConfirm={() => handleDelete(record.id)} okText="Yes" cancelText="No">
+                            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                    </Tooltip>
                 </Space>
             )
         }
     ];
+
+    const getRowClassName = (record) => {
+        const qty = record.quantity || 0;
+        const available = qty - (record.reserved || 0);
+        
+        if (available <= 0) return 'bg-red-50 hover:bg-red-100 transition-colors';
+        if (available <= 50) return 'bg-yellow-50 hover:bg-yellow-100 transition-colors'; // Low stock threshold (configurable later)
+        return 'hover:bg-gray-50 transition-colors';
+    };
 
     return (
         <MainLayout>
@@ -197,11 +245,75 @@ export default function Inventory() {
                 <div className="flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-medium text-blue-600">Inventory Management</h1>
-                        <p className="text-gray-500 text-sm mt-0.5">Total: {formatNumber(totalUnits)} units | Available: {formatNumber(totalAvailable)} | Reserved: {formatNumber(totalReserved)}</p>
+                        <p className="text-gray-500 text-sm mt-0.5">Total: {formatNumber(totalUnits)} units | Available: {formatNumber(totalAvailable)} | Reserved: {formatNumber(totalReserved)} | Live Tracking</p>
                     </div>
                     <Space>
                         <Button icon={<ReloadOutlined />} onClick={fetchInventory}>Refresh</Button>
-                        <Button icon={<ExportOutlined />}>Export</Button>
+                        <Button icon={<ExportOutlined />} onClick={async () => {
+                            if (!inventory.length) return message.warning('No data to export');
+                            const format = await new Promise(resolve => {
+                                Modal.confirm({
+                                    title: 'Export Inventory',
+                                    content: 'Select export format:',
+                                    okText: 'PDF',
+                                    cancelText: 'CSV',
+                                    onOk: () => resolve('PDF'),
+                                    onCancel: () => resolve('CSV')
+                                });
+                            });
+
+                            if (format === 'CSV') {
+                                const headers = ['Product Name', 'SKU', 'Warehouse', 'Location', 'Quantity', 'Reserved', 'Available', 'Status', 'Last Updated'];
+                                const csvContent = [
+                                    headers.join(','),
+                                    ...filteredInventory.map(item => [
+                                        `"${item.product?.name || ''}"`,
+                                        `"${item.product?.sku || ''}"`,
+                                        `"${item.warehouse?.name || ''}"`,
+                                        `"${item.location?.name || item.location?.code || ''}"`,
+                                        item.quantity || 0,
+                                        item.reserved || 0,
+                                        Math.max(0, (item.quantity || 0) - (item.reserved || 0)),
+                                        item.status || 'ACTIVE',
+                                        item.updatedAt ? new Date(item.updatedAt).toISOString() : ''
+                                    ].join(','))
+                                ].join('\n');
+                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                const url = URL.createObjectURL(blob);
+                                link.setAttribute('href', url);
+                                link.setAttribute('download', `inventory_export_${new Date().toISOString().slice(0, 10)}.csv`);
+                                link.click();
+                            } else {
+                                // PDF Export via backend (creates a temporary report)
+                                try {
+                                    message.loading({ content: 'Generating PDF...', key: 'pdf' });
+                                    const res = await apiRequest('/api/reports', {
+                                        method: 'POST',
+                                        body: JSON.stringify({
+                                            reportType: 'INVENTORY',
+                                            reportName: `Inventory Export ${new Date().toLocaleDateString()}`,
+                                            format: 'PDF'
+                                        })
+                                    }, token);
+                                    
+                                    if (res?.data?.id) {
+                                        const downloadRes = await fetch(`/api/reports/${res.data.id}/download`, {
+                                            headers: { 'Authorization': `Bearer ${token}` }
+                                        });
+                                        const blob = await downloadRes.blob();
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `inventory_export_${new Date().toISOString().slice(0, 10)}.pdf`;
+                                        a.click();
+                                        message.success({ content: 'PDF Downloaded', key: 'pdf' });
+                                    }
+                                } catch (err) {
+                                    message.error({ content: 'Failed to generate PDF', key: 'pdf' });
+                                }
+                            }
+                        }}>Export</Button>
                         <Button type="primary" icon={<PlusOutlined />} className="bg-blue-600 border-blue-600 rounded-lg" onClick={() => { setSelectedInventory(null); setViewMode(false); form.resetFields(); setModalOpen(true); }}>
                             Add Inventory
                         </Button>
@@ -224,7 +336,17 @@ export default function Inventory() {
                     <div className="p-6">
                         <div className="mb-4 flex flex-wrap items-center gap-3">
                             <Search placeholder="Search by product name, SKU, or lot number..." className="max-w-md" prefix={<SearchOutlined />} value={searchText} onChange={e => setSearchText(e.target.value)} allowClear />
-                            <Button icon={<SearchOutlined />} className="bg-blue-600 border-blue-600 text-white">Search</Button>
+                            <div className="flex gap-2">
+                                <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-green-50 px-2 py-1 rounded border border-green-100">
+                                    <div className="w-2 h-2 rounded-full bg-green-500"></div> Good Stock
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-yellow-50 px-2 py-1 rounded border border-yellow-100">
+                                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div> Low Stock (&le;50)
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-red-50 px-2 py-1 rounded border border-red-100">
+                                    <div className="w-2 h-2 rounded-full bg-red-500"></div> Out of Stock
+                                </div>
+                            </div>
                         </div>
                         <Table
                             dataSource={filteredInventory}
@@ -232,8 +354,9 @@ export default function Inventory() {
                             rowKey="id"
                             loading={loading}
                             pagination={{ showSizeChanger: true, showTotal: (t) => `Total ${t} items`, pageSize: 50 }}
-                            scroll={{ x: 1100 }}
+                            scroll={{ x: 1200 }}
                             className="[&_.ant-table-thead_th]:font-normal"
+                            rowClassName={getRowClassName}
                         />
                     </div>
                 </Card>
@@ -257,8 +380,8 @@ export default function Inventory() {
                                     <div className="text-xl font-medium">{selectedInventory.location?.name || selectedInventory.location?.code || '—'}</div>
                                 </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">
-                                    <div className="text-xs text-gray-500 font-normal">Lot Number</div>
-                                    <div className="text-xl font-medium">{selectedInventory.lotNumber || '—'}</div>
+                                    <div className="text-xs text-gray-500 font-normal">Last Moved</div>
+                                    <div className="text-xl font-medium text-sm pt-1">{selectedInventory.updatedAt ? dayjs(selectedInventory.updatedAt).fromNow() : '—'}</div>
                                 </div>
                             </div>
                         </div>
@@ -290,6 +413,7 @@ export default function Inventory() {
                             <div><div className="text-gray-500 text-sm font-normal mb-1">Batch Number</div><div className="text-gray-900">{selectedInventory.batchNumber ?? '—'}</div></div>
                             <div><div className="text-gray-500 text-sm font-normal mb-1">Serial Number</div><div className="text-gray-900">{selectedInventory.serialNumber ?? '—'}</div></div>
                             <div><div className="text-gray-500 text-sm font-normal mb-1">Best Before Date</div><div className="text-gray-900">{selectedInventory.bestBeforeDate ? dayjs(selectedInventory.bestBeforeDate).format('DD/MM/YYYY') : '—'}</div></div>
+                            <div><div className="text-gray-500 text-sm font-normal mb-1">Last Updated</div><div className="text-gray-900">{selectedInventory.updatedAt ? dayjs(selectedInventory.updatedAt).format('DD MMM YYYY HH:mm') : '—'}</div></div>
                         </div>
                     ) : (
                         <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-4">

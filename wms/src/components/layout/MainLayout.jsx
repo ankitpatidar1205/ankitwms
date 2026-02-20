@@ -26,6 +26,10 @@ import {
     UsergroupAddOutlined,
     ApiOutlined,
     DollarOutlined,
+    ThunderboltOutlined,
+    ScanOutlined,
+    ArrowUpOutlined,
+    ArrowDownOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -123,11 +127,15 @@ export const MainLayout = ({ children }) => {
 
     const getPickerMenu = () => [
         { key: '/dashboards/picker', icon: <DashboardOutlined />, label: 'My Dashboard' },
+        { key: '/stock-in', icon: <ArrowUpOutlined style={{ color: '#22c55e' }} />, label: <span className="font-bold text-green-600">Stock In</span> },
+        { key: '/stock-out', icon: <ArrowDownOutlined style={{ color: '#ef4444' }} />, label: <span className="font-bold text-red-500">Stock Out</span> },
         { key: '/picking', icon: <BoxPlotOutlined />, label: 'Pick Lists' },
     ];
 
     const getPackerMenu = () => [
         { key: '/dashboards/packer', icon: <DashboardOutlined />, label: 'My Dashboard' },
+        { key: '/stock-in', icon: <ArrowUpOutlined style={{ color: '#22c55e' }} />, label: <span className="font-bold text-green-600">Stock In</span> },
+        { key: '/stock-out', icon: <ArrowDownOutlined style={{ color: '#ef4444' }} />, label: <span className="font-bold text-red-500">Stock Out</span> },
         { key: '/packing', icon: <BoxPlotOutlined />, label: 'Packing Tasks' },
     ];
 
@@ -174,7 +182,10 @@ export const MainLayout = ({ children }) => {
 
     const getInventoryManagerMenu = () => [
         { key: '/dashboards/inventory-manager', icon: <DashboardOutlined />, label: 'Dashboard' },
+        { key: '/stock-in', icon: <ArrowUpOutlined style={{ color: '#22c55e' }} />, label: <span className="font-bold text-green-600">Stock In</span> },
+        { key: '/stock-out', icon: <ArrowDownOutlined style={{ color: '#ef4444' }} />, label: <span className="font-bold text-red-500">Stock Out</span> },
         { key: '/inventory', icon: <DatabaseOutlined />, label: 'Low Stock Alerts' },
+        { key: '/predictions', icon: <ThunderboltOutlined />, label: 'Smart Reorder (AI)' },
         { key: '/inventory/movements', icon: <DatabaseOutlined />, label: 'Today Movements' },
         {
             key: 'nav-products',
@@ -209,6 +220,8 @@ export const MainLayout = ({ children }) => {
 
     const getWarehouseManagerMenu = () => [
         { key: '/dashboards/manager', icon: <DashboardOutlined />, label: 'Dashboard' },
+        { key: '/stock-in', icon: <ArrowUpOutlined style={{ color: '#22c55e' }} />, label: <span className="font-bold text-green-600">Stock In</span> },
+        { key: '/stock-out', icon: <ArrowDownOutlined style={{ color: '#ef4444' }} />, label: <span className="font-bold text-red-500">Stock Out</span> },
         { key: '/picking', icon: <BoxPlotOutlined />, label: 'Pending Picks / Assign Pickers' },
         { key: '/packing', icon: <BoxPlotOutlined />, label: 'Pending Packs / Assign Packers' },
         { key: '/shipments', icon: <CarOutlined />, label: 'Shipments / Dispatch' },
@@ -217,6 +230,8 @@ export const MainLayout = ({ children }) => {
 
     const allMenuItems = [
         { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
+        { key: '/stock-in', icon: <ArrowUpOutlined style={{ color: '#22c55e' }} />, label: <span className="font-bold text-green-600">Stock In</span> },
+        { key: '/stock-out', icon: <ArrowDownOutlined style={{ color: '#ef4444' }} />, label: <span className="font-bold text-red-500">Stock Out</span> },
         { key: '/companies', icon: <ShopOutlined />, label: 'Company Management' },
         {
             key: 'nav-warehouses',
@@ -251,6 +266,15 @@ export const MainLayout = ({ children }) => {
                 { key: '/inventory/cycle-counts', label: 'Cycle Counts' },
                 { key: '/inventory/batches', label: 'Batches' },
                 { key: '/inventory/movements', label: 'Movements' },
+                { key: '/predictions', label: 'Smart Reorder (AI)', icon: <ThunderboltOutlined className="text-amber-400" /> },
+            ],
+        },
+        {
+            key: 'nav-integrations',
+            icon: <ApiOutlined />,
+            label: 'Integrations',
+            children: [
+                { key: '/integrations', label: 'Amazon & Shopify' },
             ],
         },
         {
@@ -303,14 +327,6 @@ export const MainLayout = ({ children }) => {
             ],
         },
         { key: '/reports', icon: <BarChartOutlined />, label: 'Reports' },
-        {
-            key: 'nav-integrations',
-            icon: <ApiOutlined />,
-            label: 'Integrations',
-            children: [
-                { key: '/integrations', label: 'API Connections' },
-            ],
-        },
         { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
         { key: '/users', icon: <TeamOutlined />, label: 'Users & Access' },
     ];

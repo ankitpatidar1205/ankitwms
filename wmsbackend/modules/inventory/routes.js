@@ -5,31 +5,39 @@ const { authenticate, requireRole } = require('../../middlewares/auth');
 
 router.use(authenticate);
 
-router.get('/products', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.listProducts);
-router.get('/products/:id', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.getProduct);
-router.post('/products', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.createProduct);
-router.post('/products/bulk', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.bulkCreateProducts);
-router.post('/products/:id/alternative-skus', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.addAlternativeSku);
-router.put('/products/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.updateProduct);
-router.delete('/products/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.removeProduct);
+// All roles can read products for scan screen
+const readRoles = ['super_admin', 'company_admin', 'inventory_manager', 'warehouse_manager', 'picker', 'packer', 'viewer'];
+const writeRoles = ['super_admin', 'company_admin', 'inventory_manager'];
+// Scan roles — picker, packer, warehouse_manager can also do adjustments for quick scan
+const scanRoles = ['super_admin', 'company_admin', 'inventory_manager', 'warehouse_manager', 'picker', 'packer'];
 
-router.get('/categories', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.listCategories);
-router.post('/categories', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.createCategory);
-router.put('/categories/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.updateCategory);
-router.delete('/categories/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.removeCategory);
+router.get('/products', requireRole(...readRoles), inventoryController.listProducts);
+router.get('/products/:id', requireRole(...readRoles), inventoryController.getProduct);
+router.post('/products', requireRole(...writeRoles), inventoryController.createProduct);
+router.post('/products/bulk', requireRole(...writeRoles), inventoryController.bulkCreateProducts);
+router.post('/products/:id/alternative-skus', requireRole(...writeRoles), inventoryController.addAlternativeSku);
+router.put('/products/:id', requireRole(...writeRoles), inventoryController.updateProduct);
+router.delete('/products/:id', requireRole(...writeRoles), inventoryController.removeProduct);
 
-router.get('/stock', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.listStock);
-router.get('/stock/by-best-before-date', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.listStockByBestBeforeDate);
-router.get('/stock/by-location', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.listStockByLocation);
-router.post('/stock', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.createStock);
-router.put('/stock/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.updateStock);
-router.delete('/stock/:id', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.removeStock);
+router.get('/categories', requireRole(...readRoles), inventoryController.listCategories);
+router.post('/categories', requireRole(...writeRoles), inventoryController.createCategory);
+router.put('/categories/:id', requireRole(...writeRoles), inventoryController.updateCategory);
+router.delete('/categories/:id', requireRole(...writeRoles), inventoryController.removeCategory);
 
-router.get('/adjustments', requireRole('super_admin', 'company_admin', 'inventory_manager', 'viewer'), inventoryController.listAdjustments);
-router.post('/adjustments', requireRole('super_admin', 'company_admin', 'inventory_manager'), inventoryController.createAdjustment);
+router.get('/stock', requireRole(...readRoles), inventoryController.listStock);
+router.get('/stock/by-best-before-date', requireRole(...readRoles), inventoryController.listStockByBestBeforeDate);
+router.get('/stock/by-location', requireRole(...readRoles), inventoryController.listStockByLocation);
+router.post('/stock', requireRole(...writeRoles), inventoryController.createStock);
+router.put('/stock/:id', requireRole(...writeRoles), inventoryController.updateStock);
+router.delete('/stock/:id', requireRole(...writeRoles), inventoryController.removeStock);
+
+// Quick Scan: picker, packer, warehouse_manager bhi adjustments kar sakte hain
+router.get('/adjustments', requireRole(...readRoles), inventoryController.listAdjustments);
+router.post('/adjustments', requireRole(...scanRoles), inventoryController.createAdjustment);
 
 router.get('/cycle-counts', requireRole('super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager', 'viewer'), inventoryController.listCycleCounts);
 router.post('/cycle-counts', requireRole('super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager'), inventoryController.createCycleCount);
+router.post('/cycle-counts/:id/complete', requireRole('super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager'), inventoryController.completeCycleCount);
 
 router.get('/batches', requireRole('super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager', 'viewer'), inventoryController.listBatches);
 router.get('/batches/:id', requireRole('super_admin', 'company_admin', 'warehouse_manager', 'inventory_manager', 'viewer'), inventoryController.getBatch);

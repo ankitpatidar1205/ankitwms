@@ -13,6 +13,7 @@ const { authenticate, requireSuperAdmin, requireRole } = require('./middlewares/
 const dashboardController = require('./controllers/dashboardController');
 const reportController = require('./controllers/reportController');
 const analyticsController = require('./controllers/analyticsController');
+const cronService = require('./services/cronService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,9 +41,14 @@ app.get('/api/dashboard/:type', authenticate, requireRole(...dashboardRoles), (r
 });
 app.get('/api/reports', authenticate, requireRole(...dashboardRoles), reportController.list);
 app.get('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.getById);
+app.get('/api/reports/:id/download', authenticate, requireRole(...dashboardRoles), reportController.download);
 app.post('/api/reports', authenticate, requireRole(...dashboardRoles), reportController.create);
 app.put('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.update);
 app.delete('/api/reports/:id', authenticate, requireRole(...dashboardRoles), reportController.remove);
+
+// AI / Predictions
+const predictionController = require('./controllers/predictionController');
+app.get('/api/predictions', authenticate, requireRole(...dashboardRoles), predictionController.list);
 
 // Analytics
 app.post('/api/analytics/pricing-calculate', authenticate, requireRole(...dashboardRoles), analyticsController.pricingCalculate);
@@ -91,6 +97,8 @@ app.use((err, req, res, next) => {
   });
 });
 
+
+
 async function start() {
   try {
     await sequelize.authenticate();
@@ -129,6 +137,10 @@ async function start() {
       await sequelize.query('PRAGMA foreign_keys = ON');
     }
     console.log('Database synced. IDs are now integers (1, 2, 3...).');
+
+    // Initialize Cron AFTER database sync is complete
+    cronService.init();
+
     app.listen(PORT, () => {
       console.log(`WMS Backend running at http://localhost:${PORT}`);
       console.log('Auth: POST /auth/login | GET /auth/me (Bearer token)');

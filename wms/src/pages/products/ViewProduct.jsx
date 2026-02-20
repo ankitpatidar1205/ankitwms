@@ -250,6 +250,7 @@ export default function ViewProduct() {
                         <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
                         <Descriptions.Item label="Primary Supplier">{supplierName}</Descriptions.Item>
                         <Descriptions.Item label="Barcode">{product.barcode || '—'}</Descriptions.Item>
+                        <Descriptions.Item label="Color">{product.color || '—'}</Descriptions.Item>
                         <Descriptions.Item label="Unit of Measure">{product.unitOfMeasure || '—'}</Descriptions.Item>
                         <Descriptions.Item label="Description" span={2}>{product.description || '—'}</Descriptions.Item>
                     </Descriptions>

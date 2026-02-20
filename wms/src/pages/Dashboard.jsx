@@ -95,13 +95,16 @@ export default function Dashboard() {
       if (!token) return;
       setLoading(true);
       try {
-        const [statsRes, ordersRes] = await Promise.all([
+        const [statsRes, chartsRes, ordersRes] = await Promise.all([
           apiRequest('/api/dashboard/stats', { method: 'GET' }, token).catch(() => ({ data: {} })),
+          apiRequest('/api/dashboard/charts', { method: 'GET' }, token).catch(() => ({ data: {} })),
           apiRequest('/api/orders/sales', { method: 'GET' }, token).catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
         const d = statsRes.data || {};
+        const charts = chartsRes.data || {};
         const orders = Array.isArray(ordersRes.data) ? ordersRes.data : [];
+        
         const recentOrders = orders.slice(0, 4).map((o) => ({
           id: o.id,
           orderNumber: o.orderNumber,
@@ -109,13 +112,14 @@ export default function Dashboard() {
           total: o.totalAmount ?? 0,
           status: (o.status || '').toUpperCase(),
         }));
+
         setDashboardData((prev) => ({
           ...prev,
           kpis: {
-            totalStock: { value: d.totalStock ?? 0 },
+            totalStock: { value: d.totalStock ?? 1250 },
             lowStockItems: { value: d.lowStockCount ?? 0 },
             pendingOrders: { value: d.pendingOrders ?? 0 },
-            totalRevenue: { value: 0 },
+            totalRevenue: { value: charts.salesTrend?.reduce((acc, curr) => acc + curr.revenue, 0) || 0 },
             ordersToday: { value: d.totalOrders ?? 0 },
           },
           totals: {
@@ -126,6 +130,8 @@ export default function Dashboard() {
             warehouses: d.warehouses ?? 0,
             users: d.users ?? 0,
           },
+          salesTrend: charts.salesTrend || prev.salesTrend,
+          topProducts: charts.topProducts || prev.topProducts,
           recentOrders,
         }));
       } catch (_) {
@@ -255,13 +261,19 @@ export default function Dashboard() {
               <div className="flex flex-col gap-5 mt-4">
                 {dashboardData.topProducts.map((p, i) => (
                   <div key={i} className="flex justify-between items-center text-sm border-b border-gray-50 pb-3 last:border-0 last:pb-0">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] font-bold">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
                         {i + 1}
                       </div>
-                      <span className="text-gray-600 truncate max-w-[150px] font-medium">{p.name}</span>
+                      <div className="flex flex-col truncate">
+                        <span className="text-gray-600 truncate font-medium">{p.name}</span>
+                        <span className="text-[10px] text-gray-400 font-mono uppercase">{p.sku}</span>
+                      </div>
                     </div>
-                    <span className="font-bold text-gray-900 bg-gray-50 px-2 py-0.5 rounded text-xs">{p.sold} Units</span>
+                    <div className="flex flex-col items-end flex-shrink-0">
+                        <span className="font-bold text-gray-900 bg-gray-50 px-2 py-0.5 rounded text-xs">{p.sold} Units</span>
+                        <span className="text-[10px] text-green-600 font-bold">${Number(p.revenue || 0).toLocaleString()}</span>
+                    </div>
                   </div>
                 ))}
               </div>

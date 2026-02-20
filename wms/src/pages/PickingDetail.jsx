@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Button, Table, Tag, Progress, message, InputNumber, Space } from 'antd';
+import { Card, Button, Table, Tag, Progress, message, InputNumber, Space, Input } from 'antd';
 import { ArrowLeftOutlined, PlayCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -159,6 +159,42 @@ export default function PickingDetail() {
                         <Progress percent={percent} size="small" strokeColor="#6366f1" className="flex-1 max-w-xs" />
                         <span className="text-gray-500 text-sm">{totalPicked} / {totalReq} units</span>
                     </div>
+
+                    {isInProgress && (
+                        <div className="mb-4">
+                            <Input
+                                placeholder="Scan Barcode / SKU to pick..."
+                                className="max-w-md"
+                                autoFocus
+                                onPressEnter={(e) => {
+                                    e.preventDefault();
+                                    const val = e.target.value.trim().toUpperCase();
+                                    if (!val) return;
+                                    
+                                    const item = items.find(i => {
+                                        const pName = (i.Product?.name || i.product?.name || '').toUpperCase();
+                                        const pSku = (i.Product?.sku || i.product?.sku || '').toUpperCase();
+                                        return pSku === val || pName === val || pSku.includes(val);
+                                    });
+
+                                    if (item) {
+                                        const current = item.quantityPicked || 0;
+                                        const req = item.quantityRequired || 0;
+                                        if (current >= req) {
+                                            message.warning('Item already fully picked');
+                                        } else {
+                                            handleQtyChange(item.id, current + 1);
+                                            message.success(`Picked: ${item.Product?.sku || 'Item'} (+1)`);
+                                            e.target.value = '';
+                                        }
+                                    } else {
+                                        message.error('Item not found in pick list');
+                                    }
+                                }}
+                            />
+                        </div>
+                    )}
+
                     <Table columns={columns} dataSource={items} rowKey="id" pagination={false} size="small" />
                 </Card>
             </div>

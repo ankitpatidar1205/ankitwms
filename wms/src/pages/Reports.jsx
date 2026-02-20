@@ -195,12 +195,28 @@ export default function Reports() {
         }
     };
 
-    const handleDownload = (record) => {
-        if (record.id == null || typeof record.id === 'string') {
+    const handleDownload = async (record) => {
+        if (!record.id || typeof record.id === 'string') {
             message.info('Download is available for generated reports only.');
             return;
         }
-        message.info('Report export (PDF/CSV) will be available in a future update. Report details can be viewed or edited.');
+        try {
+            const headers = { 'Authorization': `Bearer ${token}` };
+            const res = await fetch(`/api/reports/${record.id}/download`, { headers });
+            if (!res.ok) throw new Error('Download failed');
+            
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${record.reportName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (err) {
+            message.error('Failed to download report');
+        }
     };
 
     const filteredReports = reports;

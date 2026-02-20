@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Button, Input, Tag, Space, Card, Tabs, message, Select, Popconfirm } from 'antd';
-import { PlusOutlined, SearchOutlined, EyeOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EyeOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons';
 import { formatCurrency, formatDate, getStatusColor } from '../../utils';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -136,6 +136,69 @@ export default function SalesOrders() {
                     </div>
                     <Space size="middle" wrap>
                         <Button icon={<ReloadOutlined />} onClick={fetchOrders} className="h-10 rounded-xl">Sync Orders</Button>
+                        <Button icon={<ExportOutlined />} className="h-10 rounded-xl" onClick={async () => {
+                            if (!orders.length) return message.warning('No data to export');
+                            const format = await new Promise(resolve => {
+                                Modal.confirm({
+                                    title: 'Export Sales Orders',
+                                    content: 'Select export format:',
+                                    okText: 'PDF',
+                                    cancelText: 'CSV',
+                                    onOk: () => resolve('PDF'),
+                                    onCancel: () => resolve('CSV')
+                                });
+                            });
+
+                            if (format === 'CSV') {
+                                const headers = ['Order Number', 'Customer', 'Channel', 'Date', 'Total', 'Status', 'Items'];
+                                const csvContent = [
+                                    headers.join(','),
+                                    ...filteredOrders.map(o => [
+                                        `"${o.orderNumber || ''}"`,
+                                        `"${o.Customer?.name || o.customer?.name || ''}"`,
+                                        `"${o.salesChannel || ''}"`,
+                                        `"${o.orderDate || o.createdAt || ''}"`,
+                                        o.totalAmount || 0,
+                                        o.status || 'DRAFT',
+                                        `"${(o.OrderItems || o.orderItems || []).map(i => `${i.Product?.sku || i.product?.sku} (x${i.quantity})`).join('; ')}"`
+                                    ].join(','))
+                                ].join('\n');
+                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                const url = URL.createObjectURL(blob);
+                                link.setAttribute('href', url);
+                                link.setAttribute('download', `sales_orders_${new Date().toISOString().slice(0, 10)}.csv`);
+                                link.click();
+                            } else {
+                                // PDF Export via backend (creates a temporary report)
+                                try {
+                                    message.loading({ content: 'Generating PDF...', key: 'pdf_so' });
+                                    const res = await apiRequest('/api/reports', {
+                                        method: 'POST',
+                                        body: JSON.stringify({
+                                            reportType: 'ORDERS',
+                                            reportName: `Orders Export ${new Date().toLocaleDateString()}`,
+                                            format: 'PDF'
+                                        })
+                                    }, token);
+                                    
+                                    if (res?.data?.id) {
+                                        const downloadRes = await fetch(`/api/reports/${res.data.id}/download`, {
+                                            headers: { 'Authorization': `Bearer ${token}` }
+                                        });
+                                        const blob = await downloadRes.blob();
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `sales_orders_export_${new Date().toISOString().slice(0, 10)}.pdf`;
+                                        a.click();
+                                        message.success({ content: 'PDF Downloaded', key: 'pdf_so' });
+                                    }
+                                } catch (err) {
+                                    message.error({ content: 'Failed to generate PDF', key: 'pdf_so' });
+                                }
+                            }
+                        }}>Export</Button>
                         <Link to="/sales-orders/new">
                             <Button type="primary" icon={<PlusOutlined />} size="large" className="h-10 rounded-xl">New Order</Button>
                         </Link>

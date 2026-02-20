@@ -42,6 +42,7 @@ const VatCodes = lazy(() => import('./pages/settings/VatCodes'));
 const MarketplaceApi = lazy(() => import('./pages/integrations/MarketplaceApi'));
 const Roles = lazy(() => import('./pages/Roles'));
 const Products = lazy(() => import('./pages/Products'));
+const Predictions = lazy(() => import('./pages/Predictions'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const SalesOrders = lazy(() => import('./pages/outbound/SalesOrders'));
 const CreateSalesOrder = lazy(() => import('./pages/outbound/CreateSalesOrder'));
@@ -60,6 +61,9 @@ const Returns = lazy(() => import('./pages/outbound/Returns'));
 const ReplenishmentTasks = lazy(() => import('./pages/replenishment/Tasks'));
 const ReplenishmentSettings = lazy(() => import('./pages/replenishment/Settings'));
 const Settings = lazy(() => import('./pages/Settings'));
+const ScanScreen = lazy(() => import('./pages/ScanScreen'));
+const StockIn = lazy(() => import('./pages/StockIn'));
+const StockOut = lazy(() => import('./pages/StockOut'));
 
 
 
@@ -77,7 +81,7 @@ function App() {
                 {/* Public Routes */}
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/auth/login" element={<LoginPage />} />
-                <Route path="/auth/register" element={<RegisterPage />} />
+                {/* <Route path="/auth/register" element={<RegisterPage />} /> */}
                 <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
 
                 {/* Protected Routes */}
@@ -162,6 +166,14 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <Products />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/predictions"
+                    element={
+                        <ProtectedRoute>
+                            <Predictions />
                         </ProtectedRoute>
                     }
                 />
@@ -302,6 +314,9 @@ function App() {
                 <Route path="/analytics/margins" element={<ProtectedRoute><AnalyticsMargins /></ProtectedRoute>} />
                 <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                 <Route path="/vat-codes" element={<ProtectedRoute><VatCodes /></ProtectedRoute>} />
+                <Route path="/scan" element={<ProtectedRoute><ScanScreen /></ProtectedRoute>} />
+                <Route path="/stock-in" element={<ProtectedRoute><StockIn /></ProtectedRoute>} />
+                <Route path="/stock-out" element={<ProtectedRoute><StockOut /></ProtectedRoute>} />
                 <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
                 <Route
                     path="/profile"

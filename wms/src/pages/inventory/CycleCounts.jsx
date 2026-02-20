@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Button, Input, Card, Modal, Form, message, Tag, Tabs, Select, DatePicker } from 'antd';
-import { PlusOutlined, SearchOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EyeOutlined, ReloadOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { useAuthStore } from '../../store/authStore';
@@ -24,6 +24,10 @@ export default function CycleCounts() {
   const [viewingCount, setViewingCount] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [performModalOpen, setPerformModalOpen] = useState(false);
+  const [countingItem, setCountingItem] = useState(null);
+  const [locationStocks, setLocationStocks] = useState([]);
+  const [countedValues, setCountedValues] = useState({});
   const [form] = Form.useForm();
 
   const fetchCycleCounts = useCallback(async () => {
@@ -81,6 +85,65 @@ export default function CycleCounts() {
       fetchCycleCounts();
     } catch (err) {
       message.error(err?.message || err?.data?.message || 'Failed to create cycle count.');
+    }
+  };
+
+  const openPerformCount = async (r) => {
+    setCountingItem(r);
+    setCountedValues({});
+    setPerformModalOpen(true);
+    if (r.locationId) {
+      try {
+        const res = await apiRequest(`/api/inventory/stock?locationId=${r.locationId}`, { method: 'GET' }, token);
+        const stocks = Array.isArray(res?.data) ? res.data : [];
+        const uniqueProducts = [];
+        const seen = new Set();
+        stocks.forEach(s => {
+            if(!seen.has(s.productId)) {
+                seen.add(s.productId);
+                uniqueProducts.push({
+                    productId: s.productId,
+                    name: s.Product?.name,
+                    sku: s.Product?.sku,
+                    systemQty: s.quantity
+                });
+            } else {
+                 const existing = uniqueProducts.find(p => p.productId === s.productId);
+                 if(existing) existing.systemQty += (s.quantity || 0);
+            }
+        });
+        setLocationStocks(uniqueProducts);
+        const initialCounts = {};
+        uniqueProducts.forEach(p => initialCounts[p.productId] = 0);
+        setCountedValues(initialCounts);
+      } catch (e) {
+        message.error('Failed to load location stock');
+        setLocationStocks([]);
+      }
+    } else {
+      setLocationStocks([]);
+    }
+  };
+
+  const handleCompleteCount = async () => {
+    if (!countingItem) return;
+    try {
+      const products = Object.keys(countedValues).map(pid => ({
+        productId: parseInt(pid),
+        countedQty: countedValues[pid]
+      }));
+      
+      await apiRequest(`/api/inventory/cycle-counts/${countingItem.id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ products })
+      }, token);
+      
+      message.success('Cycle count completed & stock adjusted.');
+      setPerformModalOpen(false);
+      setCountingItem(null);
+      fetchCycleCounts();
+    } catch (err) {
+      message.error(err?.message || 'Failed to complete count');
     }
   };
 
@@ -154,18 +217,34 @@ export default function CycleCounts() {
       key: 'actions',
       width: 80,
       render: (_, r) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<EyeOutlined />}
-          className="text-blue-600 p-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            setViewingCount(r);
-          }}
-        >
-          View
-        </Button>
+        <>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            className="text-blue-600 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              setViewingCount(r);
+            }}
+          >
+            View
+          </Button>
+          {r.status !== 'COMPLETED' && (
+            <Button
+              type="link"
+              size="small"
+              icon={<PlayCircleOutlined />}
+              className="text-green-600 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                openPerformCount(r);
+              }}
+            >
+              Count
+            </Button>
+          )}
+        </>
       ),
     },
   ];

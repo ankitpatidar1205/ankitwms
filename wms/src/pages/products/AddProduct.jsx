@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Form, Input, Select, InputNumber, Button, message, Upload, Row, Col } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { apiRequest } from '../../api/client';
+import CategoryModal from '../../components/modals/CategoryModal';
+import SupplierModal from '../../components/modals/SupplierModal';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -25,7 +27,10 @@ export default function AddProduct() {
     const [saving, setSaving] = useState(false);
     const [categories, setCategories] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
+    const [warehouses, setWarehouses] = useState([]);
     const [imageList, setImageList] = useState([]);
+    const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+    const [supplierModalOpen, setSupplierModalOpen] = useState(false);
 
     const fetchCategories = useCallback(async () => {
         if (!token) return;
@@ -47,10 +52,21 @@ export default function AddProduct() {
         }
     }, [token]);
 
+    const fetchWarehouses = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await apiRequest('/api/warehouses', { method: 'GET' }, token);
+            setWarehouses(Array.isArray(res?.data) ? res.data : []);
+        } catch (_) {
+            setWarehouses([]);
+        }
+    }, [token]);
+
     useEffect(() => {
         fetchCategories();
         fetchSuppliers();
-    }, [fetchCategories, fetchSuppliers]);
+        fetchWarehouses();
+    }, [fetchCategories, fetchSuppliers, fetchWarehouses]);
 
     const fileToBase64 = (file) =>
         new Promise((resolve, reject) => {
@@ -90,6 +106,7 @@ export default function AddProduct() {
                 name: values.name,
                 sku: values.sku?.trim() || values.name?.replace(/\s/g, '_').toUpperCase().slice(0, 30),
                 barcode: values.barcode || null,
+                color: values.color || null,
                 description: values.description || null,
                 productType: values.productType || null,
                 unitOfMeasure: values.unitOfMeasure || null,
@@ -165,6 +182,7 @@ export default function AddProduct() {
         weightUnit: 'kg',
         reorderQty: 0,
         maxStock: 0,
+        color: '',
     };
 
     return (
@@ -205,26 +223,41 @@ export default function AddProduct() {
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={8}>
-                                <Form.Item label="Category" name="categoryId">
-                                    <Select allowClear placeholder="Select category" className="rounded-lg w-full" size="large">
-                                        {categories.map((c) => (
-                                            <Option key={c.id} value={c.id}>{c.name}</Option>
-                                        ))}
-                                    </Select>
+                                <Form.Item label="Category" required>
+                                    <div className="flex gap-2">
+                                        <Form.Item name="categoryId" noStyle>
+                                            <Select allowClear placeholder="Select category" className="rounded-lg w-full" size="large">
+                                                {categories.map((c) => (
+                                                    <Option key={c.id} value={c.id}>{c.name}</Option>
+                                                ))}
+                                            </Select>
+                                        </Form.Item>
+                                        <Button icon={<PlusOutlined />} onClick={() => setCategoryModalOpen(true)} size="large" />
+                                    </div>
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={12}>
-                                <Form.Item label="Primary Supplier" name="supplierId">
-                                    <Select allowClear placeholder="Select primary supplier" className="rounded-lg w-full" size="large">
-                                        {suppliers.map((s) => (
-                                            <Option key={s.id} value={s.id}>{s.name}</Option>
-                                        ))}
-                                    </Select>
+                                <Form.Item label="Primary Supplier">
+                                    <div className="flex gap-2">
+                                        <Form.Item name="supplierId" noStyle>
+                                            <Select allowClear placeholder="Select primary supplier" className="rounded-lg w-full" size="large">
+                                                {suppliers.map((s) => (
+                                                    <Option key={s.id} value={s.id}>{s.name}</Option>
+                                                ))}
+                                            </Select>
+                                        </Form.Item>
+                                        <Button icon={<PlusOutlined />} onClick={() => setSupplierModalOpen(true)} size="large" />
+                                    </div>
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={12}>
                                 <Form.Item label="Barcode" name="barcode">
                                     <Input placeholder="Enter barcode (EAN/UPC)" className="rounded-lg" size="large" />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label="Color" name="color">
+                                    <Input placeholder="e.g. Red, Blue, Black" className="rounded-lg" size="large" />
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={12}>
@@ -292,8 +325,12 @@ export default function AddProduct() {
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={12}>
-                                <Form.Item label="Warehouse ID" name="warehouseId">
-                                    <Input placeholder="e.g. WS_PRD_R_1_CH" className="rounded-lg" />
+                                <Form.Item label="Warehouse" name="warehouseId">
+                                    <Select allowClear placeholder="Select warehouse" className="rounded-lg w-full" size="large">
+                                        {warehouses.map((w) => (
+                                            <Option key={w.id} value={w.id}>{w.name}</Option>
+                                        ))}
+                                    </Select>
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={12}>
@@ -434,6 +471,22 @@ export default function AddProduct() {
                     </div>
                 </Form>
             </div>
+            <CategoryModal
+                open={categoryModalOpen}
+                onClose={() => setCategoryModalOpen(false)}
+                onSuccess={(newCat) => {
+                    setCategories(prev => [...prev, newCat]);
+                    form.setFieldValue('categoryId', newCat.id);
+                }}
+            />
+            <SupplierModal
+                open={supplierModalOpen}
+                onClose={() => setSupplierModalOpen(false)}
+                onSuccess={(newSup) => {
+                    setSuppliers(prev => [...prev, newSup]);
+                    form.setFieldValue('supplierId', newSup.id);
+                }}
+            />
         </MainLayout>
     );
 }

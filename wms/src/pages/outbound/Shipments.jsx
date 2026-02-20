@@ -356,14 +356,16 @@ export default function Shipments() {
                                                 <Button size="small" type="default" onClick={async () => {
                                                     try {
                                                         const res = await apiRequest(`/api/shipments/${selectedShipment.id}/deduct-stock`, { method: 'POST' }, token);
-                                                        const msg = res?.message || 'Stock deducted. Refresh Inventory / Products page.';
-                                                        if (res?.deducted > 0) message.success(msg); else message.warning(msg);
-                                                        setViewModalOpen(false);
-                                                        fetchShipments();
-                                                    } catch (e) {
-                                                        message.error(e?.message || 'Deduct failed');
-                                                    }
-                                                }}>Deduct inventory for this shipment</Button>
+                                                    const msg = res?.message || 'Stock deducted. Refresh Inventory / Products page.';
+                                                    if (res?.deducted > 0) message.success(msg); else message.warning(msg);
+                                                    setViewModalOpen(false);
+                                                    fetchShipments();
+                                                } catch (e) {
+                                                    message.error(e?.message || 'Deduct failed');
+                                                }
+                                            }} disabled={selectedShipment.stockDeducted}>
+                                                {selectedShipment.stockDeducted ? 'Inventory Deducted' : 'Deduct inventory for this shipment'}
+                                            </Button>
                                             </div>
                                         </>
                                     )}
@@ -382,7 +384,7 @@ export default function Shipments() {
                                                         } catch (e) {
                                                             message.error(e?.message || 'Update failed');
                                                         }
-                                                    }}>Mark as Shipped</Button>
+                                                    }} disabled={selectedShipment.stockDeducted}>Mark as Shipped</Button>
                                                     <Button size="small" onClick={async () => {
                                                         try {
                                                             await apiRequest(`/api/shipments/${selectedShipment.id}`, { method: 'PUT', body: JSON.stringify({ deliveryStatus: 'DELIVERED' }) }, token);

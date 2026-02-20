@@ -536,28 +536,72 @@ export default function GoodsReceiving() {
                     width={720}
                     className="rounded-xl"
                 >
+                    <div className="mb-4">
+                        <Input
+                            placeholder="Scan Barcode / SKU and press Enter..."
+                            prefix={<SearchOutlined className="text-blue-500" />}
+                            className="rounded-lg border-blue-200"
+                            autoFocus
+                            onPressEnter={(e) => {
+                                e.preventDefault();
+                                const scanVal = e.target.value.trim().toUpperCase();
+                                if (!scanVal) return;
+                                
+                                const items = receiveForm.getFieldValue('items') || [];
+                                let foundIndex = -1;
+                                
+                                // Enhanced Search: Check SKU, Product Name, or ID
+                                items.forEach((item, idx) => {
+                                    const pName = (item.productName || '').toUpperCase();
+                                    const pSku = (item.productSku || '').toUpperCase();
+                                    if (pSku === scanVal || pName === scanVal || pSku.includes(scanVal) || scanVal === String(item.productId)) {
+                                        foundIndex = idx;
+                                    }
+                                });
+
+                                if (foundIndex !== -1) {
+                                    const currentQty = items[foundIndex].receivedQty || 0;
+                                    const newQty = currentQty + 1;
+                                    
+                                    // Update Form
+                                    const newItems = [...items];
+                                    newItems[foundIndex] = { ...newItems[foundIndex], receivedQty: newQty };
+                                    receiveForm.setFieldsValue({ items: newItems });
+                                    
+                                    message.success(`Scanned: ${items[foundIndex].productSku || 'Product'} (+1)`);
+                                    e.target.value = ''; // Clear for next scan
+                                } else {
+                                    message.error('Product not found in this receipt');
+                                    // Optional: Play error sound here
+                                }
+                            }}
+                        />
+                    </div>
                     <Form form={receiveForm} layout="vertical" onFinish={handleReceiveItems} className="pt-2">
                         <Form.List name="items">
                             {(fields) => (
                                 <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
-                                    {fields.map(({ key, name, ...restField }) => (
+                                    {fields.map(({ key, name, ...restField }) => {
+                                       const itemVal = receiveForm.getFieldValue(['items', name]);
+                                       const isComplete = (itemVal?.receivedQty || 0) >= (itemVal?.expectedQty || 0);
+                                       return (
                                         <div
                                             key={key}
-                                            className="flex items-center justify-between gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100"
+                                            className={`flex items-center justify-between gap-4 p-4 rounded-xl border ${isComplete ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100'}`}
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-medium text-gray-800">
-                                                    {receiveForm.getFieldValue(['items', name, 'productName']) || selectedReceipt?.items?.[name]?.productName || selectedReceipt?.items?.[name]?.productSku || `Product #${selectedReceipt?.items?.[name]?.productId ?? ''}`}
+                                                    {itemVal?.productName || selectedReceipt?.items?.[name]?.productName || selectedReceipt?.items?.[name]?.productSku || `Product #${selectedReceipt?.items?.[name]?.productId ?? ''}`}
                                                 </div>
                                                 <div className="text-xs text-gray-500">
-                                                    SKU: {receiveForm.getFieldValue(['items', name, 'productSku']) || selectedReceipt?.items?.[name]?.productSku || '—'}
+                                                    SKU: {itemVal?.productSku || selectedReceipt?.items?.[name]?.productSku || '—'}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4 flex-shrink-0">
                                                 <div className="text-center">
                                                     <div className="text-xs text-gray-500 font-medium">Expected (units)</div>
                                                     <div className="font-medium">
-                                                        {receiveForm.getFieldValue(['items', name, 'expectedQty'])}
+                                                        {itemVal?.expectedQty}
                                                     </div>
                                                 </div>
                                                 <Form.Item
@@ -581,7 +625,7 @@ export default function GoodsReceiving() {
                                                 </Form.Item>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             )}
                         </Form.List>

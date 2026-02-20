@@ -18,6 +18,8 @@ import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { apiRequest } from '../../api/client';
 import { formatCurrency } from '../../utils';
+import CategoryModal from '../../components/modals/CategoryModal';
+import SupplierModal from '../../components/modals/SupplierModal';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -40,6 +42,7 @@ export default function EditProduct() {
     const [saving, setSaving] = useState(false);
     const [categories, setCategories] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
+    const [warehouses, setWarehouses] = useState([]);
     const [imageList, setImageList] = useState([]);
     const [productSku, setProductSku] = useState('');
     const [cartonList, setCartonList] = useState([]);
@@ -52,6 +55,8 @@ export default function EditProduct() {
     const [savingPriceList, setSavingPriceList] = useState(false);
     const [productData, setProductData] = useState(null);
     const [vatCodes, setVatCodes] = useState([]);
+    const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+    const [supplierModalOpen, setSupplierModalOpen] = useState(false);
 
     /** Save cartons to API immediately (no need to click Save Changes) */
     const saveCartonsToApi = useCallback(async (newCartonList) => {
@@ -140,6 +145,16 @@ export default function EditProduct() {
         }
     }, [token]);
 
+    const fetchWarehouses = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await apiRequest('/api/warehouses', { method: 'GET' }, token);
+            setWarehouses(Array.isArray(res?.data) ? res.data : []);
+        } catch (_) {
+            setWarehouses([]);
+        }
+    }, [token]);
+
     const fetchVatCodes = useCallback(async () => {
         if (!token) return;
         try {
@@ -154,8 +169,9 @@ export default function EditProduct() {
         fetchProduct();
         fetchCategories();
         fetchSuppliers();
+        fetchWarehouses();
         fetchVatCodes();
-    }, [fetchProduct, fetchCategories, fetchSuppliers, fetchVatCodes]);
+    }, [fetchProduct, fetchCategories, fetchSuppliers, fetchWarehouses, fetchVatCodes]);
 
     // Prefill form after product is loaded and form is mounted – jo data add hai woh dikhe
     useEffect(() => {
@@ -168,6 +184,7 @@ export default function EditProduct() {
             name: productData.name ?? '',
             sku: productData.sku ?? '',
             barcode: productData.barcode ?? undefined,
+            color: productData.color ?? undefined,
             description: productData.description ?? undefined,
             productType: productData.productType ?? 'SIMPLE',
             unitOfMeasure: productData.unitOfMeasure ?? 'EACH',
@@ -245,6 +262,7 @@ export default function EditProduct() {
                 name: values.name,
                 sku: values.sku?.trim(),
                 barcode: values.barcode || null,
+                color: values.color || null,
                 description: values.description || null,
                 productType: values.productType || null,
                 unitOfMeasure: values.unitOfMeasure || null,
@@ -258,7 +276,7 @@ export default function EditProduct() {
                 marketplaceSkus: {
                     hdSku: values.hdSku?.trim() || null,
                     hdSaleSku: values.hdSaleSku?.trim() || null,
-                    warehouseId: values.warehouseId?.trim() || null,
+                    warehouseId: values.warehouseId || null,
                     ebayId: values.ebayId?.trim() || null,
                     amazonSku: values.amazonSku?.trim() || null,
                     amazonSkuSplitBefore: values.amazonSkuSplitBefore?.trim() || null,
@@ -354,12 +372,22 @@ export default function EditProduct() {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label="Category" name="categoryId">
-                                <Select allowClear placeholder="Select category" className="rounded-lg w-full" size="large">
-                                    {categories.map((c) => (
-                                        <Option key={c.id} value={c.id}>{c.name}</Option>
-                                    ))}
-                                </Select>
+                            <Form.Item label="Color" name="color">
+                                <Input placeholder="e.g. Red, Blue, Black" className="rounded-lg" size="large" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                            <Form.Item label="Category">
+                                <div className="flex gap-2">
+                                    <Form.Item name="categoryId" noStyle>
+                                        <Select allowClear placeholder="Select category" className="rounded-lg w-full" size="large">
+                                            {categories.map((c) => (
+                                                <Option key={c.id} value={c.id}>{c.name}</Option>
+                                            ))}
+                                        </Select>
+                                    </Form.Item>
+                                    <Button icon={<PlusOutlined />} onClick={() => setCategoryModalOpen(true)} size="large" />
+                                </div>
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
@@ -373,12 +401,17 @@ export default function EditProduct() {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label="Primary Supplier" name="supplierId">
-                                <Select allowClear placeholder="Select primary supplier" className="rounded-lg w-full" size="large">
-                                    {suppliers.map((s) => (
-                                        <Option key={s.id} value={s.id}>{s.name}</Option>
-                                    ))}
-                                </Select>
+                            <Form.Item label="Primary Supplier">
+                                <div className="flex gap-2">
+                                    <Form.Item name="supplierId" noStyle>
+                                        <Select allowClear placeholder="Select primary supplier" className="rounded-lg w-full" size="large">
+                                            {suppliers.map((s) => (
+                                                <Option key={s.id} value={s.id}>{s.name}</Option>
+                                            ))}
+                                        </Select>
+                                    </Form.Item>
+                                    <Button icon={<PlusOutlined />} onClick={() => setSupplierModalOpen(true)} size="large" />
+                                </div>
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
@@ -646,8 +679,12 @@ export default function EditProduct() {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label="Warehouse ID" name="warehouseId">
-                                <Input placeholder="e.g. WS_PRD_R_1_CH" className="rounded-lg" />
+                            <Form.Item label="Warehouse" name="warehouseId">
+                                <Select allowClear placeholder="Select warehouse" className="rounded-lg w-full" size="large">
+                                    {warehouses.map((w) => (
+                                        <Option key={w.id} value={w.id}>{w.name}</Option>
+                                    ))}
+                                </Select>
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
@@ -831,6 +868,22 @@ export default function EditProduct() {
                     <Tabs defaultActiveKey="basic" type="card" className="edit-product-tabs" items={tabItems} />
                 </Form>
             </div>
+            <CategoryModal
+                open={categoryModalOpen}
+                onClose={() => setCategoryModalOpen(false)}
+                onSuccess={(newCat) => {
+                    setCategories(prev => [...prev, newCat]);
+                    form.setFieldValue('categoryId', newCat.id);
+                }}
+            />
+            <SupplierModal
+                open={supplierModalOpen}
+                onClose={() => setSupplierModalOpen(false)}
+                onSuccess={(newSup) => {
+                    setSuppliers(prev => [...prev, newSup]);
+                    form.setFieldValue('supplierId', newSup.id);
+                }}
+            />
         </MainLayout>
     );
 }

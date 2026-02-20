@@ -91,6 +91,7 @@ export default function Products() {
         { title: 'Product Name', dataIndex: 'name', key: 'name', width: 180, ellipsis: true, render: (v, r) => <Link to={`/products/${r.id}`} className="text-blue-600 hover:underline">{v || '—'}</Link> },
         { title: 'Category', key: 'category', width: 120, render: (_, r) => getCategoryName(r.categoryId) },
         { title: 'Barcode', dataIndex: 'barcode', key: 'barcode', width: 130, render: (v) => <span className="font-mono text-xs text-gray-600">{v || '—'}</span> },
+        { title: 'Color', dataIndex: 'color', key: 'color', width: 100, render: (t) => t || '—' },
         { title: 'Price', dataIndex: 'price', key: 'price', width: 95, align: 'right', render: (v) => <span className="font-medium">{formatCurrency(v)}</span> },
         { title: 'Cost', dataIndex: 'costPrice', key: 'costPrice', width: 95, align: 'right', render: (v) => <span className="text-gray-600">{formatCurrency(v)}</span> },
         { title: 'Stock', key: 'stock', width: 90, align: 'right', render: (_, r) => <span className="inline-flex items-center gap-1"><ShoppingOutlined className="text-slate-400 text-xs" />{(r.ProductStocks || r.inventory || [])?.reduce((s, i) => s + (i.quantity || 0), 0) || 0}</span> },

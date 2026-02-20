@@ -7,6 +7,7 @@ import { MainLayout } from '../../components/layout/MainLayout';
 import { apiRequest } from '../../api/client';
 import { formatCurrency } from '../../utils';
 import dayjs from 'dayjs';
+import CustomerModal from '../../components/modals/CustomerModal';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -23,6 +24,12 @@ export default function CreateSalesOrder() {
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [orderItems, setOrderItems] = useState([]);
+    const [customerModalOpen, setCustomerModalOpen] = useState(false);
+
+    const handleCustomerAdded = (newCustomer) => {
+        setCustomers((prev) => [...prev, newCustomer]);
+        form.setFieldValue('customerId', newCustomer.id);
+    };
 
     const fetchCustomersAndProducts = useCallback(async () => {
         if (!token) return;
@@ -151,12 +158,18 @@ export default function CreateSalesOrder() {
                 <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ orderDate: dayjs(), priority: 'MEDIUM', salesChannel: 'DIRECT' }}>
                     <Card title="Order Information" className="rounded-xl border border-gray-100 shadow-sm mb-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <Form.Item label="Customer" name="customerId" rules={[{ required: true, message: 'Select customer' }]}>
-                                <Select placeholder="Select customer" allowClear className="w-full">
-                                    {customers.map((c) => (
-                                        <Option key={c.id} value={c.id}>{c.name} {c.email ? `(${c.email})` : ''}</Option>
-                                    ))}
-                                </Select>
+
+                            <Form.Item label="Customer">
+                                <div className="flex gap-2">
+                                    <Form.Item name="customerId" noStyle rules={[{ required: true, message: 'Select customer' }]}>
+                                        <Select placeholder="Select customer" allowClear className="w-full" showSearch optionFilterProp="children">
+                                            {customers.map((c) => (
+                                                <Option key={c.id} value={c.id}>{c.name} {c.email ? `(${c.email})` : ''}</Option>
+                                            ))}
+                                        </Select>
+                                    </Form.Item>
+                                    <Button icon={<PlusOutlined />} onClick={() => setCustomerModalOpen(true)} />
+                                </div>
                             </Form.Item>
                             <Form.Item label="Order Number">
                                 <Input value="Auto-generated" disabled className="rounded-lg" />
@@ -226,6 +239,12 @@ export default function CreateSalesOrder() {
                         </Button>
                     </div>
                 </Form>
+                
+                <CustomerModal 
+                    open={customerModalOpen} 
+                    onCancel={() => setCustomerModalOpen(false)} 
+                    onSuccess={handleCustomerAdded} 
+                />
             </div>
         </MainLayout>
     );
